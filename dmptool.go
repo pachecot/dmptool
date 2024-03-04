@@ -11,12 +11,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func split(line string) (string, string) {
+func split(line string) (string, string, bool) {
 	ss := strings.SplitN(line, ":", 2)
 	if len(ss) == 1 {
-		return strings.Trim(ss[0], " "), ""
+		return strings.Trim(ss[0], " "), "", false
 	}
-	return strings.Trim(ss[0], " "), strings.Trim(ss[1], " ")
+	return strings.Trim(ss[0], " "), strings.Trim(ss[1], " "), true
 }
 
 const dmpTimeLayout = "1/2/2006 3:04:05 PM"
@@ -25,19 +25,19 @@ func parseDmpTime(value string) (time.Time, error) {
 	return time.ParseInLocation(dmpTimeLayout, value, time.Local)
 }
 
-type scanner interface {
-	Scan(string) scanner
+type parser interface {
+	Parse(string) parser
 }
 
-type codeScanner struct {
-	prev     scanner
+type codeParser struct {
+	prev     parser
 	count    int
 	path     string
 	modified time.Time
 	lines    []string
 }
 
-func (s *codeScanner) Scan(line string) scanner {
+func (s *codeParser) Parse(line string) parser {
 	txt := strings.Trim(line, " ")
 	if txt == "EndByteCode" {
 		file := s.path + ".pe"
@@ -64,15 +64,15 @@ func (s *codeScanner) Scan(line string) scanner {
 	return s
 }
 
-type dictionaryScanner struct {
-	prev scanner
+type dictionaryParser struct {
+	prev parser
 }
 
-func (s *dictionaryScanner) Scan(line string) scanner {
-	k, _ := split(line)
+func (s *dictionaryParser) Parse(line string) parser {
+	k, _, _ := split(line)
 	switch k {
 	case "Dictionary":
-		return &dictionaryScanner{
+		return &dictionaryParser{
 			prev: s,
 		}
 	case "EndDictionary":
@@ -81,15 +81,15 @@ func (s *dictionaryScanner) Scan(line string) scanner {
 	return s
 }
 
-type objectScanner struct {
-	prev     scanner
+type objectParser struct {
+	prev     parser
 	deviceId string
 	path     string
 	modified time.Time
 }
 
-func (s *objectScanner) Scan(line string) scanner {
-	k, v := split(line)
+func (s *objectParser) Parse(line string) parser {
+	k, v, _ := split(line)
 	switch k {
 	case "EndObject":
 		return s.prev
@@ -100,7 +100,7 @@ func (s *objectScanner) Scan(line string) scanner {
 			s.modified = t
 		}
 	case "ByteCode":
-		return &codeScanner{
+		return &codeParser{
 			path:     s.path,
 			modified: s.modified,
 			prev:     s,
@@ -109,21 +109,21 @@ func (s *objectScanner) Scan(line string) scanner {
 	return s
 }
 
-type controllerScanner struct {
-	prev scanner
+type controllerParser struct {
+	prev parser
 	path string
 }
 
-func (s *controllerScanner) Scan(line string) scanner {
-	k, v := split(line)
+func (s *controllerParser) Parse(line string) parser {
+	k, v, _ := split(line)
 	switch k {
 	case "Object":
-		return &objectScanner{
+		return &objectParser{
 			prev: s,
 			path: path.Join(s.path, v),
 		}
 	case "InfinetCtlr":
-		return &infControllerScanner{
+		return &infControllerParser{
 			prev: s,
 			path: path.Join(s.path, v),
 		}
@@ -133,29 +133,29 @@ func (s *controllerScanner) Scan(line string) scanner {
 	return s
 }
 
-type dmpScanner struct {
+type dmpParser struct {
 	outDir string
 }
 
-func (s *dmpScanner) Scan(line string) scanner {
-	k, v := split(line)
+func (s *dmpParser) Parse(line string) parser {
+	k, v, _ := split(line)
 	switch k {
 	case "Dictionary":
-		return &dictionaryScanner{
+		return &dictionaryParser{
 			prev: s,
 		}
 	case "InfinetCtlr":
-		return &infControllerScanner{
+		return &infControllerParser{
 			prev: s,
 			path: path.Join(s.outDir, v),
 		}
 	case "BeginController":
-		return &controllerScanner{
+		return &controllerParser{
 			prev: s,
 			path: path.Join(s.outDir, v),
 		}
 	case "Object":
-		return &objectScanner{
+		return &objectParser{
 			prev: s,
 			path: path.Join(s.outDir, v),
 		}
@@ -163,16 +163,16 @@ func (s *dmpScanner) Scan(line string) scanner {
 	return s
 }
 
-type infControllerScanner struct {
-	prev scanner
+type infControllerParser struct {
+	prev parser
 	path string
 }
 
-func (s *infControllerScanner) Scan(line string) scanner {
-	k, v := split(line)
+func (s *infControllerParser) Parse(line string) parser {
+	k, v, _ := split(line)
 	switch k {
 	case "Object":
-		return &objectScanner{
+		return &objectParser{
 			prev: s,
 			path: path.Join(s.path, v),
 		}
@@ -182,28 +182,51 @@ func (s *infControllerScanner) Scan(line string) scanner {
 	return s
 }
 
-func cmdExtractPE(srcFile string, destDir string) {
+type peCommand struct {
+	fileName string
+	outDir   string
+	file     *os.File
+	scanner  *bufio.Scanner
+}
 
-	sf, err := os.Open(srcFile)
+func (cmd *peCommand) Open() error {
+	var err error
+	cmd.file, err = os.Open(cmd.fileName)
 	if err != nil {
-		fmt.Println("error opening file:", srcFile)
+		return err
+	}
+	cmd.scanner = bufio.NewScanner(cmd.file)
+	return nil
+}
+
+func (cmd *peCommand) Close() error {
+	return cmd.file.Close()
+}
+
+func (cmd *peCommand) Scan(pf parser) error {
+	for cmd.scanner.Scan() {
+		if err := cmd.scanner.Err(); err != nil {
+			return err
+		}
+		pf = pf.Parse(cmd.scanner.Text())
+	}
+	return nil
+}
+
+func (cmd *peCommand) Execute() {
+	err := cmd.Open()
+	if err != nil {
+		fmt.Println("error opening file:", cmd.fileName)
 		return
 	}
-	defer sf.Close()
+	defer cmd.Close()
 
-	ss := bufio.NewScanner(sf)
-
-	var s scanner
-	s = &dmpScanner{
-		outDir: destDir,
+	p := &dmpParser{
+		outDir: cmd.outDir,
 	}
-
-	for ss.Scan() {
-		if err = ss.Err(); err != nil {
-			fmt.Println("Error:", ss.Err())
-			return
-		}
-		s = s.Scan(ss.Text())
+	err = cmd.Scan(p)
+	if err != nil {
+		fmt.Println("Error:", err)
 	}
 }
 
@@ -219,7 +242,11 @@ func main() {
 		Short: "extract all PE program files into individual files a directory structure",
 		Args:  cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdExtractPE(args[0], args[1])
+			c := &peCommand{
+				fileName: args[0],
+				outDir:   args[1],
+			}
+			c.Execute()
 		},
 	}
 
