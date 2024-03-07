@@ -8,7 +8,7 @@ import (
 	"github.com/tpacheco/dmptool/cmds/ref"
 )
 
-const version = "0.1.2"
+const version = "0.2.2"
 
 func newCmdPE() *cobra.Command {
 	pe := &pe.Command{}
