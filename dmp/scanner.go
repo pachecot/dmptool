@@ -7,13 +7,13 @@ import (
 
 const maxTokenSize = 400000
 
-type Scanner struct {
+type scanner struct {
 	FileName string
 	file     *os.File
 	scanner  *bufio.Scanner
 }
 
-func (cmd *Scanner) Open() error {
+func (cmd *scanner) open() error {
 	var err error
 	cmd.file, err = os.Open(cmd.FileName)
 	if err != nil {
@@ -24,17 +24,17 @@ func (cmd *Scanner) Open() error {
 	return nil
 }
 
-func (cmd *Scanner) Close() error {
+func (cmd *scanner) close() error {
 	return cmd.file.Close()
 }
 
-func (cmd *Scanner) Scan(p Parser) error {
+func (cmd *scanner) scan(p parser) error {
 	line := 0
 	for cmd.scanner.Scan() {
 		if err := cmd.scanner.Err(); err != nil {
 			return err
 		}
-		p = p.Parse(cmd.scanner.Text(), line)
+		p = p.parse(cmd.scanner.Text(), line)
 		line++
 	}
 	if err := cmd.scanner.Err(); err != nil {

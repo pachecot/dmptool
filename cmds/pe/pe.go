@@ -28,30 +28,10 @@ func (s *peHandler) Code(code *dmp.Code) {
 		return
 	}
 
-	lines := fixDoubleEOL(code.Lines)
-	os.WriteFile(file, []byte(strings.Join(lines, "\r\n")), os.ModePerm)
+	os.WriteFile(file, []byte(strings.Join(code.Lines, "\r\n")), os.ModePerm)
 	if !code.Modified.IsZero() {
 		os.Chtimes(file, code.Modified, code.Modified)
 	}
-}
-
-// fixDoubleEOL removes the extra empty lines that are
-// inserted into the dmp file bytecode sections.
-func fixDoubleEOL(lines []string) []string {
-	next := []string{}
-	count := 0
-	for _, line := range lines {
-		if line == "" {
-			count++
-			if count%2 != 0 {
-				continue
-			}
-		} else {
-			count = 0
-		}
-		next = append(next, line)
-	}
-	return next
 }
 
 type Command struct {

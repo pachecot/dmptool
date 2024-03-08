@@ -15,90 +15,44 @@ func split(line string) (string, string, bool) {
 	return strings.Trim(ss[0], " "), strings.Trim(ss[1], " "), true
 }
 
-const dmpTimeLayout = "1/2/2006 3:04:05 PM"
-
-func parseDmpTime(value string) (time.Time, error) {
-	return time.ParseInLocation(dmpTimeLayout, value, time.Local)
+// fixDoubleEOL removes the extra empty lines that are
+// inserted into the dmp file bytecode sections.
+func fixDoubleEOL(lines []string) []string {
+	next := []string{}
+	count := 0
+	for _, line := range lines {
+		if line == "" {
+			count++
+			if count%2 != 0 {
+				continue
+			}
+		} else {
+			count = 0
+		}
+		next = append(next, line)
+	}
+	return next
 }
 
-type Parser interface {
-	Parse(string, int) Parser
+type parser interface {
+	parse(string, int) parser
 }
 
-type Handler interface {
-	Code(p *Code)
-	Object(p *objectParser)
-	StartElement(p Parser)
-	EndElement(p Parser)
-}
-
-type EmptyHandler struct{}
-
-func (h *EmptyHandler) Code(p *Code)           {}
-func (h *EmptyHandler) Object(p *objectParser) {}
-func (h *EmptyHandler) StartElement(p Parser)  {}
-func (h *EmptyHandler) EndElement(p Parser)    {}
-
-type ForwardingHandler struct{ h Handler }
-
-func (h *ForwardingHandler) Code(p *Code)           { h.h.Code(p) }
-func (h *ForwardingHandler) Object(p *objectParser) { h.h.Object(p) }
-func (h *ForwardingHandler) StartElement(p Parser)  { h.h.StartElement(p) }
-func (h *ForwardingHandler) EndElement(p Parser)    { h.h.EndElement(p) }
-
-type arrayParser struct {
+type blockParser struct {
 	prev  *objectParser
+	name  string
+	end   string
 	lines []string
-	h     Handler
 }
 
-func (p *arrayParser) Parse(line string, n int) Parser {
+func (p *blockParser) parse(line string, n int) parser {
 	txt := strings.Trim(line, " ")
-	if txt == "EndArray" {
-		p.prev.properties["Array"] = strings.Join(p.lines, "\r\n")
+	if txt == p.end {
+		p.prev.properties[p.name] = strings.Join(p.lines, "\r\n")
 		return p.prev
 	}
 	p.lines = append(p.lines, line)
 	return p
-}
-
-type membersParser struct {
-	prev  *objectParser
-	lines []string
-	h     Handler
-}
-
-func (p *membersParser) Parse(line string, n int) Parser {
-	txt := strings.Trim(line, " ")
-	if txt == "EndMembers" {
-		p.prev.properties["Members"] = strings.Join(p.lines, "\r\n")
-		return p.prev
-	}
-	p.lines = append(p.lines, line)
-	return p
-}
-
-type alarmLinksParser struct {
-	prev  *objectParser
-	lines []string
-	h     Handler
-}
-
-func (p *alarmLinksParser) Parse(line string, n int) Parser {
-	txt := strings.Trim(line, " ")
-	if txt == "EndAlarmLinks" {
-		p.prev.properties["AlarmLinks"] = strings.Join(p.lines, "\r\n")
-		return p.prev
-	}
-	p.lines = append(p.lines, line)
-	return p
-}
-
-type Code struct {
-	Path     string
-	Type     string
-	Modified time.Time
-	Lines    []string
 }
 
 type codeParser struct {
@@ -110,15 +64,16 @@ type codeParser struct {
 	h        Handler
 }
 
-func (p *codeParser) Parse(line string, n int) Parser {
+func (p *codeParser) parse(line string, n int) parser {
 	txt := strings.Trim(line, " ")
 	if txt == "EndByteCode" {
-		p.prev.properties["ByteCode"] = strings.Join(p.lines, "\r\n")
+		lines := fixDoubleEOL(p.lines)
+		p.prev.properties["ByteCode"] = strings.Join(lines, "\r\n")
 		p.h.Code(&Code{
 			Path:     p.path,
 			Type:     p.kind,
 			Modified: p.modified,
-			Lines:    p.lines,
+			Lines:    lines,
 		})
 		return p.prev
 	}
@@ -127,12 +82,12 @@ func (p *codeParser) Parse(line string, n int) Parser {
 }
 
 type dictionaryParser struct {
-	prev  Parser
+	prev  parser
 	h     Handler
 	lines []string
 }
 
-func (p *dictionaryParser) Parse(line string, n int) Parser {
+func (p *dictionaryParser) parse(line string, n int) parser {
 	k, _, _ := split(line)
 	switch k {
 	case "Dictionary":
@@ -149,65 +104,52 @@ func (p *dictionaryParser) Parse(line string, n int) Parser {
 }
 
 type objectParser struct {
-	prev       Parser
+	prev       parser
+	name       string
 	path       string
 	modified   time.Time
 	last       string
-	cdt        []string
 	properties map[string]string
 	h          Handler
 }
 
-func (p *objectParser) Parse(line string, n int) Parser {
+func (p *objectParser) parse(line string, n int) parser {
 	k, v, _ := split(line)
 
 	if p.properties == nil {
 		p.properties = make(map[string]string)
 	}
 
-	if p.cdt != nil {
-		// CDT mode, just read lines until end is encountered
-		if k == "EndOfCDT" {
-			p.properties[p.last] = strings.Join(p.cdt, "\r\n")
-			p.cdt = nil
-		} else {
-			p.cdt = append(p.cdt, line)
-		}
-		return p
-	}
-
 	switch k {
 
 	case "EndObject":
-		p.h.EndElement(p)
+		p.h.Object(&Object{
+			Path:       p.path,
+			Modified:   p.modified,
+			Properties: p.properties,
+		})
+		p.h.End("Object", p.name)
 		return p.prev
 
 	case "LastChange":
 		p.properties[k] = v
-		if t, err := parseDmpTime(v); err == nil {
+		if t, err := ParseTime(v); err == nil {
 			p.modified = t
 		}
 
 	case "{": // start of a CDT
-		p.cdt = []string{line}
-		return p
-
-	case "Array":
-		return &arrayParser{
-			prev: p,
-			h:    p.h,
+		return &blockParser{
+			prev:  p,
+			name:  p.last,
+			lines: []string{line},
+			end:   "EndOfCDT",
 		}
 
-	case "Members":
-		return &membersParser{
+	case "Array", "Members", "AlarmLinks":
+		return &blockParser{
 			prev: p,
-			h:    p.h,
-		}
-
-	case "AlarmLinks":
-		return &alarmLinksParser{
-			prev: p,
-			h:    p.h,
+			name: k,
+			end:  "End" + k,
 		}
 
 	case "ByteCode":
@@ -229,27 +171,33 @@ func (p *objectParser) Parse(line string, n int) Parser {
 }
 
 type controllerParser struct {
-	prev Parser
+	prev parser
+	name string
 	path string
 	h    Handler
 }
 
-func (p *controllerParser) Parse(line string, n int) Parser {
+func (p *controllerParser) parse(line string, n int) parser {
 	k, v, _ := split(line)
 	switch k {
 	case "Object":
+		p.h.Begin(k, v)
 		return &objectParser{
 			prev: p,
+			name: v,
 			path: filepath.Join(p.path, v),
 			h:    p.h,
 		}
 	case "InfinetCtlr":
+		p.h.Begin(k, v)
 		return &infControllerParser{
 			prev: p,
+			name: v,
 			path: filepath.Join(p.path, v),
 			h:    p.h,
 		}
 	case "EndController":
+		p.h.Begin("Controller", p.name)
 		return p.prev
 	}
 	return p
@@ -257,84 +205,98 @@ func (p *controllerParser) Parse(line string, n int) Parser {
 
 type dmpParser struct {
 	path    string
+	name    string
 	devPath string
 	h       Handler
 }
 
-func (p *dmpParser) Parse(line string, n int) Parser {
+func (p *dmpParser) parse(line string, n int) parser {
 	k, v, _ := split(line)
 	switch k {
+
 	case "Path":
 		p.path = v
-		return p
+		p.name = v
+
 	case "Dictionary":
+		p.h.Begin(k, v)
 		p.devPath = filepath.Join(p.path, v)
 		return &dictionaryParser{
 			prev: p,
 			h:    p.h,
 		}
+
 	case "InfinetCtlr":
+		p.h.Begin(k, v)
 		return &infControllerParser{
 			prev: p,
+			name: v,
 			path: filepath.Join(p.path, v),
 			h:    p.h,
 		}
+
 	case "BeginController":
+		p.h.Begin(k, v)
 		return &controllerParser{
 			prev: p,
+			name: v,
 			path: filepath.Join(p.path, v),
 			h:    p.h,
 		}
+
 	case "Object":
+		p.h.Begin(k, v)
 		return &objectParser{
 			prev: p,
+			name: v,
 			path: filepath.Join(p.path, v),
 			h:    p.h,
 		}
 	}
+
 	return p
 }
 
 type infControllerParser struct {
-	prev Parser
+	prev parser
+	name string
 	path string
 	h    Handler
 }
 
-func (s *infControllerParser) Parse(line string, n int) Parser {
+func (p *infControllerParser) parse(line string, n int) parser {
 	k, v, _ := split(line)
 	switch k {
 	case "Object":
+		p.h.Begin(k, v)
 		return &objectParser{
-			prev: s,
-			path: filepath.Join(s.path, v),
-			h:    s.h,
+			prev: p,
+			name: v,
+			path: filepath.Join(p.path, v),
+			h:    p.h,
 		}
 	case "EndInfinetCtlr":
-		return s.prev
+		p.h.End("InfinetCtlr", p.name)
+		return p.prev
 	}
-	return s
-}
-
-func NewParser(h Handler) Parser {
-	return &dmpParser{h: h}
+	return p
 }
 
 func ParseFile(file string, h Handler) string {
-	scanner := &Scanner{
+	scanner := &scanner{
 		FileName: file,
 	}
 
-	err := scanner.Open()
+	err := scanner.open()
 	if err != nil {
 		fmt.Println("error opening file:", file)
 		return ""
 	}
-	defer scanner.Close()
+	defer scanner.close()
 
 	p := &dmpParser{h: h}
 
-	err = scanner.Scan(p)
+	err = scanner.scan(p)
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
