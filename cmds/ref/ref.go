@@ -2,6 +2,7 @@ package ref
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strings"
@@ -13,7 +14,9 @@ import (
 
 type refHandler struct {
 	dmp.EmptyHandler
-	refs map[string][]string
+	refs         map[string][]*dmp.Object
+	withGraphics bool
+	withCode     bool
 }
 
 func isValid(r rune) bool {
@@ -50,12 +53,40 @@ func parseRefs(s string) []string {
 	return append([]string{s[start:end]}, parseRefs(s[end:])...)
 }
 
-func (h *refHandler) Code(c *dmp.Code) {
-	for _, line := range c.Lines {
-		line = removeComment(line)
-		refs := parseRefs(line)
-		for _, r := range refs {
-			h.refs[r] = append(h.refs[r], c.Path)
+func (h *refHandler) Object(do *dmp.Object) {
+
+	typ := do.Type
+
+	switch typ {
+	case "Graphics":
+		if !h.withGraphics {
+			return
+		}
+		if cdt, ok := do.Properties["PanelObjectList"]; ok {
+			lines := strings.Split(cdt, "\r\n")
+			for _, line := range lines {
+				refs := parseRefs(line)
+				for _, r := range refs {
+					h.refs[r] = append(h.refs[r], do)
+				}
+			}
+			return
+		}
+
+	case "InfinityFunction", "Program", "InfinityProgram":
+		if !h.withCode {
+			return
+		}
+		if byteCode, ok := do.Properties["ByteCode"]; ok {
+			lines := strings.Split(byteCode, "\r\n")
+			for _, line := range lines {
+				line = removeComment(line)
+				refs := parseRefs(line)
+				for _, r := range refs {
+					h.refs[r] = append(h.refs[r], do)
+				}
+			}
+			return
 		}
 	}
 }
@@ -66,12 +97,17 @@ type Command struct {
 	Bare     bool
 	All      bool
 	Sources  bool
+	ShowType bool
+	Graphics bool
+	Code     bool
 }
 
 func (cmd *Command) Execute() {
 
 	h := &refHandler{
-		refs: make(map[string][]string),
+		refs:         make(map[string][]*dmp.Object),
+		withGraphics: cmd.Graphics,
+		withCode:     cmd.Code,
 	}
 
 	dmpPath := dmp.ParseFile(cmd.FileName, h)
@@ -85,67 +121,130 @@ func (cmd *Command) Execute() {
 		})
 	}
 
-	f := os.Stdout
+	w := os.Stdout
 
 	if cmd.OutFile != "" {
 		var err error
-		f, err = os.Create(cmd.OutFile)
+		w, err = os.Create(cmd.OutFile)
 		if err != nil {
 			fmt.Println("could not create file")
 			return
 		}
-		defer func() { f.Close() }()
+		defer func() {
+			w.Sync()
+			w.Close()
+		}()
 	}
 
 	if cmd.Bare {
 		for _, v := range refs {
-			fmt.Fprintln(f, v)
+			fmt.Fprintln(w, v)
 		}
 		return
 	}
 
 	if len(refs) == 0 {
-		fmt.Fprintln(f, "No references found.")
+		fmt.Fprintln(w, "No references found.")
 		return
 	}
 
-	fmt.Fprintf(f, "Device external references\n\n  Source device: %s\n\n", dmpPath)
+	fmt.Fprintf(w, "Device external references\n\n  Source device: %s\n\n", dmpPath)
 
-	w := len("External Reference")
+	if cmd.Sources {
+		if cmd.ShowType {
+			printWithSourceAndType(w, h)
+			return
+		}
+		printWithSource(w, h)
+		return
+	}
+	printWithoutSource(w, h)
+}
+
+func printWithoutSource(w io.Writer, h *refHandler) {
+	refs := maps.Keys(h.refs)
+	slices.Sort(refs)
+
+	wRef := len("External Reference")
 	for _, v := range refs {
 		n := len(v)
-		if w < n {
-			w = n
+		if wRef < n {
+			wRef = n
 		}
 	}
-	if !cmd.Sources {
 
-		fmt.Fprintf(f, "%s%s %5s\n", "External Reference", strings.Repeat(" ", w-len("External Reference")), "Count")
-		fmt.Fprintf(f, "%s%s %5s\n", strings.Repeat("-", w), "", "-----")
-		for _, v := range refs {
-			fmt.Fprintf(f, "%s%s %5d\n", v, strings.Repeat(" ", w-len(v)), len(h.refs[v]))
+	fmt.Fprintf(w, "%s%s %5s\n", "External Reference", strings.Repeat(" ", wRef-len("External Reference")), "Count")
+	fmt.Fprintf(w, "%s%s %5s\n", strings.Repeat("-", wRef), "", "-----")
+	for _, v := range refs {
+		fmt.Fprintf(w, "%s%s %5d\n", v, strings.Repeat(" ", wRef-len(v)), len(h.refs[v]))
+	}
+}
+
+func printWithSourceAndType(w io.Writer, h *refHandler) {
+
+	refs := maps.Keys(h.refs)
+	slices.Sort(refs)
+
+	wRef := len("External Reference")
+	for _, v := range refs {
+		n := len(v)
+		if wRef < n {
+			wRef = n
 		}
-		return
 	}
 
-	w1 := 0
-	for _, xs := range h.refs {
-		for _, x := range xs {
-			n := len(x)
-			if w1 < n {
-				w1 = n
+	wSrc := 0
+	for _, dos := range h.refs {
+		for _, do := range dos {
+			n := len(do.Path)
+			if wSrc < n {
+				wSrc = n
 			}
 		}
 	}
 
-	fmt.Fprintf(f, "%s%s %s\n", "External Reference", strings.Repeat(" ", w-len("External Reference")), "Source")
-	fmt.Fprintf(f, "%s %s\n", strings.Repeat("-", w), strings.Repeat("-", w1))
+	fmt.Fprintf(w, "%s%s %s%s %s\n", "External Reference", strings.Repeat(" ", wRef-len("External Reference")), "Source", strings.Repeat(" ", wSrc-len("Source")), "Type Name")
+	fmt.Fprintf(w, "%s %s %s\n", strings.Repeat("-", wRef), strings.Repeat("-", wSrc), "----------------")
 	for _, v := range refs {
-		xs := h.refs[v]
-		fmt.Fprintf(f, "%s%s %s\n", v, strings.Repeat(" ", w-len(v)), xs[0])
-		for _, x := range xs[1:] {
-			fmt.Fprintf(f, "-%s%s %s\n", strings.Repeat(" ", len(v)-1), strings.Repeat(" ", w-len(v)), x)
+		dos := h.refs[v]
+		fmt.Fprintf(w, "%s%s %s%s %s\n", v, strings.Repeat(" ", wRef-len(v)), dos[0].Path, strings.Repeat(" ", wSrc-len(dos[0].Path)), dos[0].Type)
+		for _, do := range dos[1:] {
+			fmt.Fprintf(w, "-%s%s %s%s %s\n", strings.Repeat(" ", len(v)-1), strings.Repeat(" ", wRef-len(v)), do.Path, strings.Repeat(" ", wSrc-len(do.Path)), do.Type)
 		}
 	}
 
+}
+
+func printWithSource(w io.Writer, h *refHandler) {
+
+	refs := maps.Keys(h.refs)
+	slices.Sort(refs)
+
+	wRef := len("External Reference")
+	for _, v := range refs {
+		n := len(v)
+		if wRef < n {
+			wRef = n
+		}
+	}
+
+	wSrc := 0
+	for _, dos := range h.refs {
+		for _, do := range dos {
+			n := len(do.Path)
+			if wSrc < n {
+				wSrc = n
+			}
+		}
+	}
+
+	fmt.Fprintf(w, "%s%s %s\n", "External Reference", strings.Repeat(" ", wRef-len("External Reference")), "Source")
+	fmt.Fprintf(w, "%s %s\n", strings.Repeat("-", wRef), strings.Repeat("-", wSrc))
+	for _, v := range refs {
+		dos := h.refs[v]
+		fmt.Fprintf(w, "%s%s %s\n", v, strings.Repeat(" ", wRef-len(v)), dos[0].Path)
+		for _, do := range dos[1:] {
+			fmt.Fprintf(w, "-%s%s %s\n", strings.Repeat(" ", len(v)-1), strings.Repeat(" ", wRef-len(v)), do.Path)
+		}
+	}
 }

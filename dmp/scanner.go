@@ -2,42 +2,28 @@ package dmp
 
 import (
 	"bufio"
-	"os"
+	"io"
 )
 
+// maxTokenSize is the for buffer used by the buffio Scanner.
+// Found this to work. Not sure on max size, but default is too small.
 const maxTokenSize = 400000
 
-type scanner struct {
-	FileName string
-	file     *os.File
-	scanner  *bufio.Scanner
-}
+func scanWith(r io.Reader, p parser) error {
 
-func (cmd *scanner) open() error {
-	var err error
-	cmd.file, err = os.Open(cmd.FileName)
-	if err != nil {
-		return err
-	}
-	cmd.scanner = bufio.NewScanner(cmd.file)
-	cmd.scanner.Buffer(make([]byte, 0, maxTokenSize), maxTokenSize)
-	return nil
-}
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, maxTokenSize), maxTokenSize)
 
-func (cmd *scanner) close() error {
-	return cmd.file.Close()
-}
-
-func (cmd *scanner) scan(p parser) error {
 	line := 0
-	for cmd.scanner.Scan() {
-		if err := cmd.scanner.Err(); err != nil {
+	for scanner.Scan() {
+		if err := scanner.Err(); err != nil {
 			return err
 		}
-		p = p.parse(cmd.scanner.Text(), line)
+		p = p.parse(&token{value: scanner.Text(), line: line})
 		line++
 	}
-	if err := cmd.scanner.Err(); err != nil {
+
+	if err := scanner.Err(); err != nil {
 		return err
 	}
 	return nil
