@@ -10,8 +10,9 @@ import (
 
 type peHandler struct {
 	dmp.EmptyHandler
-	destDir  string
-	withType bool
+	destDir    string
+	withType   bool
+	typePrefix string
 }
 
 func isCodeType(typeName string) bool {
@@ -34,12 +35,12 @@ func (s *peHandler) handleCode(obj *dmp.Object) {
 		return
 	}
 
-	file := filepath.Join(s.destDir, obj.Path+".pe")
+	dirName := s.destDir
 	if s.withType {
-		file = filepath.Join(filepath.Dir(file), obj.Type, filepath.Base(file))
+		dirName = filepath.Join(dirName, s.typePrefix+obj.Type)
 	}
+	file := filepath.Join(dirName, obj.Path+".pe")
 
-	dirName := filepath.Dir(file)
 	err := os.MkdirAll(dirName, os.ModeDir)
 	if err != nil {
 		fmt.Printf("error creating directory %s: %e\n", dirName, err)
@@ -71,8 +72,9 @@ type Command struct {
 func (cmd *Command) Execute() {
 
 	h := &peHandler{
-		destDir:  cmd.OutDir,
-		withType: cmd.TypeFolder,
+		destDir:    cmd.OutDir,
+		withType:   cmd.TypeFolder,
+		typePrefix: "__",
 	}
 
 	dmp.ParseFile(cmd.FileName, h)
