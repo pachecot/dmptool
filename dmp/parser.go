@@ -106,8 +106,7 @@ func (p *blockParser) parse(tk *token) parser {
 func (p *codeParser) parse(tk *token) parser {
 	txt := strings.TrimSpace(tk.value)
 	if txt == prop_bytecode_end {
-		lines := fixDoubleEOL(p.lines)
-		p.prev.obj.Properties[prop_bytecode] = strings.Join(lines, "\r\n")
+		p.prev.obj.Properties[prop_bytecode] = strings.Join(p.lines, "\r\n")
 		return p.prev
 	}
 	p.lines = append(p.lines, tk.value)
