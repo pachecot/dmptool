@@ -13,26 +13,29 @@ type listHandler struct {
 	dmp.EmptyHandler
 	fields  []string
 	types   []string
-	filter  string
+	filters []string
 	results []*dmp.Object
 }
 
 func (h *listHandler) Object(do *dmp.Object) {
 
-	if len(h.types) > 0 {
-		if slices.Contains(h.types, do.Type) {
-			h.results = append(h.results, do)
+	if len(h.filters) > 0 {
+		if !slices.ContainsFunc(h.filters,
+			func(f string) bool {
+				return strings.Contains(do.Name, f) ||
+					strings.Contains(do.Path, f)
+			}) {
 			return
 		}
-		if h.filter == "" {
-			return
-		}
-	}
-	if h.filter == "" {
-		h.results = append(h.results, do)
-		return
 	}
 
+	if len(h.types) > 0 {
+		if !slices.Contains(h.types, do.Type) {
+			return
+		}
+	}
+
+	h.results = append(h.results, do)
 }
 
 type Command struct {
@@ -40,16 +43,16 @@ type Command struct {
 	OutFile  string
 	Fields   []string
 	Types    []string
-	Filter   string
+	Filters  []string
 	Record   bool
 }
 
 func (cmd *Command) Execute() {
 
 	h := &listHandler{
-		fields: cmd.Fields,
-		filter: cmd.Filter,
-		types:  cmd.Types,
+		fields:  cmd.Fields,
+		filters: cmd.Filters,
+		types:   cmd.Types,
 	}
 
 	dmp.ParseFile(cmd.FileName, h)

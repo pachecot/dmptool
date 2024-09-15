@@ -41,7 +41,7 @@ func newCmdList() *cobra.Command {
 
 	cc := &cobra.Command{
 		Use:     "list <dump file>",
-		Short:   "extract all PE program files into individual files a directory structure",
+		Short:   "extracts list of objects into list",
 		Aliases: []string{"script", "code", "programs"},
 		Args:    cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -51,7 +51,7 @@ func newCmdList() *cobra.Command {
 	}
 
 	cc.Flags().StringVarP(&listCmd.OutFile, "output", "o", "", "output file to write to")
-	cc.Flags().StringVarP(&listCmd.Filter, "where", "w", "", "where filter")
+	cc.Flags().StringSliceVarP(&listCmd.Filters, "where", "w", []string{}, "where like filter")
 	cc.Flags().BoolVarP(&listCmd.Record, "records", "r", false, "list in a record format")
 	cc.Flags().StringSliceVarP(&listCmd.Fields, "fields", "f", []string{"DeviceId", "Name", "Type"}, "fields")
 	cc.Flags().StringSliceVarP(&listCmd.Types, "types", "t", []string{}, "types filter")
