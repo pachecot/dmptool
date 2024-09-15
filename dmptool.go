@@ -16,7 +16,7 @@ func newCmdPE() *cobra.Command {
 
 	cc := &cobra.Command{
 		Use:     "pe <dump file> <output directory>",
-		Short:   "extract all PE program files into individual files a directory structure",
+		Short:   "extracts all PE program files into individual files",
 		Aliases: []string{"script", "code", "programs"},
 		Args:    cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -26,7 +26,11 @@ func newCmdPE() *cobra.Command {
 		},
 	}
 
-	cc.Flags().BoolVarP(&pe.TypeFolder, "type", "t", false, "incudes the typename in the folders")
+	cf := cc.Flags()
+	cf.BoolVarP(&pe.TypeFolder, "type", "t", false, "includes the typename in the folders")
+	cf.BoolVarP(&pe.Flatten, "flatten", "f", false, "flatten the file path to a single name")
+	cf.StringVar(&pe.FlattenSep, "separator", "~", "separator used when flattening file paths")
+	cf.StringVar(&pe.TypePrefix, "prefix", "__", "prefix used when including file types")
 
 	return cc
 }
