@@ -1,6 +1,6 @@
 module github.com/tpacheco/dmptool
 
-go 1.22
+go 1.23
 
 require (
 	github.com/spf13/cobra v1.7.0
