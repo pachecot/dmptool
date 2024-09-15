@@ -12,7 +12,7 @@ func split(line string) (string, string, bool) {
 
 func trimR(s string) string {
 	i := len(s)
-	for s[i-1] == '\r' {
+	for i > 0 && s[i-1] == '\r' {
 		i--
 	}
 	return s[:i]
