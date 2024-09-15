@@ -113,7 +113,7 @@ func (cmd *Command) Execute() {
 	}
 	fmt.Fprintln(w)
 
-	for i, _ := range cmd.Fields {
+	for i := range cmd.Fields {
 		fmt.Fprintf(w, formats[i], strings.Repeat("-", ws[i]))
 	}
 	fmt.Fprintln(w)
