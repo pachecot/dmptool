@@ -9,7 +9,7 @@ import (
 	"github.com/tpacheco/dmptool/cmds/ref"
 )
 
-const version = "0.3.1"
+const version = "0.3.4"
 
 func newCmdPE() *cobra.Command {
 	pe := &pe.Command{}
@@ -27,7 +27,7 @@ func newCmdPE() *cobra.Command {
 	}
 
 	cf := cc.Flags()
-	cf.BoolVarP(&pe.TypeFolder, "type", "t", false, "includes the typename in the folders")
+	cf.BoolVarP(&pe.TypeFolder, "type", "t", false, "include the typename as a folder for the files")
 	cf.BoolVarP(&pe.Flatten, "flatten", "f", false, "flatten the file path to a single name")
 	cf.StringVar(&pe.FlattenSep, "separator", "~", "separator used when flattening file paths")
 	cf.StringVar(&pe.TypePrefix, "prefix", "__", "prefix used when including file types")
@@ -42,7 +42,7 @@ func newCmdList() *cobra.Command {
 	cc := &cobra.Command{
 		Use:     "list <dump file>",
 		Short:   "extracts list of objects into list",
-		Aliases: []string{"script", "code", "programs"},
+		Aliases: []string{},
 		Args:    cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			listCmd.FileName = args[0]
@@ -83,6 +83,16 @@ func newCmdRef() *cobra.Command {
 	return cc
 }
 
+func newCmdVersion() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "print the version",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("version:", version)
+		},
+	}
+}
+
 func main() {
 
 	cc := &cobra.Command{
@@ -94,13 +104,7 @@ func main() {
 		newCmdPE(),
 		newCmdRef(),
 		newCmdList(),
-		&cobra.Command{
-			Use:   "version",
-			Short: "print the version",
-			Run: func(cmd *cobra.Command, args []string) {
-				fmt.Println("version:", version)
-			},
-		},
+		newCmdVersion(),
 	)
 	cc.Execute()
 }
