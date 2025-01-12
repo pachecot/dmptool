@@ -1,8 +1,11 @@
 package list
 
 import (
+	"encoding/csv"
 	"fmt"
+	"log"
 	"os"
+	"path"
 	"slices"
 	"strings"
 
@@ -79,6 +82,8 @@ func (cmd *Command) Execute() {
 
 	w := os.Stdout
 
+	csvFormat := false
+
 	if cmd.OutFile != "" {
 		var err error
 		w, err = os.Create(cmd.OutFile)
@@ -90,6 +95,8 @@ func (cmd *Command) Execute() {
 			w.Sync()
 			w.Close()
 		}()
+
+		csvFormat = strings.ToLower(path.Ext(cmd.OutFile)) == ".csv"
 	}
 
 	cols := len(cmd.Fields)
@@ -120,6 +127,20 @@ func (cmd *Command) Execute() {
 				}
 			}
 		}
+	}
+
+	if csvFormat {
+		csvW := csv.NewWriter(w)
+		if err := csvW.Write(cmd.Fields); err != nil {
+			log.Fatalln("error writing record to csv:", err)
+		}
+		for _, row := range table {
+			if err := csvW.Write(row); err != nil {
+				log.Fatalln("error writing record to csv:", err)
+			}
+		}
+		csvW.Flush()
+		return
 	}
 
 	formats := make([]string, cols)
