@@ -5,6 +5,9 @@ import "time"
 // Handler is the interface for the parsing events
 type Handler interface {
 
+	// Path is called on the path
+	Path(pathName string)
+
 	// Object is called on completion of the Object
 	// and contains all the properties found.
 	Object(obj *Object)
@@ -33,6 +36,7 @@ type Handler interface {
 // EmptyHandler is a default implementation of the Handler.
 type EmptyHandler struct{}
 
+func (h *EmptyHandler) Path(s string)                 {}
 func (h *EmptyHandler) Object(obj *Object)            {}
 func (h *EmptyHandler) Dictionary(dic *Dictionary)    {}
 func (h *EmptyHandler) Begin(tag string, name string) {}

@@ -14,25 +14,41 @@ type listHandler struct {
 	fields  []string
 	types   []string
 	filters []string
+	names   []string
+	devices []string
 	results []*dmp.Object
 }
 
 func (h *listHandler) Object(do *dmp.Object) {
-
-	if len(h.filters) > 0 {
-		if !slices.ContainsFunc(h.filters,
-			func(f string) bool {
-				return strings.Contains(do.Name, f) ||
-					strings.Contains(do.Path, f)
-			}) {
-			return
-		}
+	if len(h.types) > 0 && !slices.Contains(h.types, do.Type) {
+		return
 	}
 
-	if len(h.types) > 0 {
-		if !slices.Contains(h.types, do.Type) {
-			return
+	if len(h.names) > 0 && !slices.ContainsFunc(h.names, func(f string) bool {
+		return strings.Contains(do.Name, f)
+	}) {
+		return
+	}
+
+	if len(h.devices) > 0 && !slices.ContainsFunc(h.devices, func(f string) bool {
+		return strings.Contains(do.Path, f)
+	}) {
+		return
+	}
+
+	if len(h.filters) > 0 && !slices.ContainsFunc(h.filters, func(f string) bool {
+		if i := strings.Index(f, "="); i > 0 {
+			k := strings.TrimSpace(f[:i])
+			v := strings.TrimSpace(f[i+1:])
+			p, ok := do.Properties[k]
+			if !ok {
+				return false
+			}
+			return p == v || strings.Contains(p, v)
 		}
+		return strings.Contains(do.Name, f) || strings.Contains(do.Path, f)
+	}) {
+		return
 	}
 
 	h.results = append(h.results, do)
@@ -44,6 +60,8 @@ type Command struct {
 	Fields   []string
 	Types    []string
 	Filters  []string
+	Names    []string
+	Devices  []string
 	Record   bool
 }
 
@@ -51,6 +69,8 @@ func (cmd *Command) Execute() {
 
 	h := &listHandler{
 		fields:  cmd.Fields,
+		names:   cmd.Names,
+		devices: cmd.Devices,
 		filters: cmd.Filters,
 		types:   cmd.Types,
 	}

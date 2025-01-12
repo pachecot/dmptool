@@ -26,6 +26,8 @@ const (
 	tag_infinet_ctlr_end = "EndInfinetCtlr"
 	tag_object           = "Object"
 	tag_object_end       = "EndObject"
+
+	new_line = "\n"
 )
 
 type token struct {
@@ -96,7 +98,7 @@ func (p *blockParser) parse(tk *token) parser {
 		if p.includeEnd {
 			p.lines = append(p.lines, tk.value)
 		}
-		p.prev.obj.Properties[p.name] = strings.Join(p.lines, "\r\n")
+		p.prev.obj.Properties[p.name] = strings.Join(p.lines, new_line)
 		return p.prev
 	}
 	p.lines = append(p.lines, tk.value)
@@ -106,7 +108,7 @@ func (p *blockParser) parse(tk *token) parser {
 func (p *codeParser) parse(tk *token) parser {
 	txt := strings.TrimSpace(tk.value)
 	if txt == prop_bytecode_end {
-		p.prev.obj.Properties[prop_bytecode] = strings.Join(p.lines, "\r\n")
+		p.prev.obj.Properties[prop_bytecode] = strings.Join(p.lines, new_line)
 		return p.prev
 	}
 	p.lines = append(p.lines, tk.value)
@@ -288,6 +290,7 @@ func (p *dmpParser) parse(tk *token) parser {
 			p.path = v
 			p.name = v
 		}
+		p.h.Path(v)
 
 	case tag_dictionary:
 		p.h.Begin(k, v)

@@ -9,7 +9,7 @@ import (
 	"github.com/tpacheco/dmptool/cmds/ref"
 )
 
-const version = "0.3.4"
+const version = "0.4.1"
 
 func newCmdPE() *cobra.Command {
 	pe := &pe.Command{}
@@ -52,6 +52,8 @@ func newCmdList() *cobra.Command {
 
 	cc.Flags().StringVarP(&listCmd.OutFile, "output", "o", "", "output file to write to")
 	cc.Flags().StringSliceVarP(&listCmd.Filters, "where", "w", []string{}, "where like filter")
+	cc.Flags().StringSliceVarP(&listCmd.Names, "names", "n", []string{}, "filter with matching names")
+	cc.Flags().StringSliceVarP(&listCmd.Devices, "devices", "d", []string{}, "filter with matching device ids / paths")
 	cc.Flags().BoolVarP(&listCmd.Record, "records", "r", false, "list in a record format")
 	cc.Flags().StringSliceVarP(&listCmd.Fields, "fields", "f", []string{"DeviceId", "Name", "Type"}, "fields")
 	cc.Flags().StringSliceVarP(&listCmd.Types, "types", "t", []string{}, "types filter")
@@ -98,8 +100,8 @@ func main() {
 	cc := &cobra.Command{
 		Use:   "dmptool <command>",
 		Short: "continuum dump file tool",
+		Args:  cobra.MinimumNArgs(2),
 	}
-
 	cc.AddCommand(
 		newCmdPE(),
 		newCmdRef(),

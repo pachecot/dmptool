@@ -19,7 +19,7 @@ func scanWith(r io.Reader, p parser) error {
 		if err := scanner.Err(); err != nil {
 			return err
 		}
-		// some lines are terminated with \r\r\n scan removes only \r\n
+		// some lines are terminated with extra \r scan doesn't remove
 		text := trimR(scanner.Text())
 		p = p.parse(&token{
 			value: text,

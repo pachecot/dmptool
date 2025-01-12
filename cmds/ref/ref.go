@@ -63,7 +63,7 @@ func (h *refHandler) Object(do *dmp.Object) {
 			return
 		}
 		if cdt, ok := do.Properties["PanelObjectList"]; ok {
-			lines := strings.Split(cdt, "\r\n")
+			lines := strings.Split(cdt, "\n")
 			for _, line := range lines {
 				refs := parseRefs(line)
 				for _, r := range refs {
@@ -78,7 +78,7 @@ func (h *refHandler) Object(do *dmp.Object) {
 			return
 		}
 		if byteCode, ok := do.Properties["ByteCode"]; ok {
-			lines := strings.Split(byteCode, "\r\n")
+			lines := strings.Split(byteCode, "")
 			for _, line := range lines {
 				line = removeComment(line)
 				refs := parseRefs(line)
