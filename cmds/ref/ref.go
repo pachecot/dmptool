@@ -37,11 +37,11 @@ func parseRefs(s string) []string {
 		return nil
 	}
 	start := i - 1
-	if s[start] == ' ' {
+	if start >= 0 && s[start] == ' ' {
 		return nil
 	}
 	end := i + 1
-	if s[end] == ' ' {
+	if end < len(s) && s[end] == ' ' {
 		return nil
 	}
 	for start > 0 && isValid(rune(s[start-1])) {
@@ -78,7 +78,7 @@ func (h *refHandler) Object(do *dmp.Object) {
 			return
 		}
 		if byteCode, ok := do.Properties["ByteCode"]; ok {
-			lines := strings.Split(byteCode, "")
+			lines := strings.Split(byteCode, "\n")
 			for _, line := range lines {
 				line = removeComment(line)
 				refs := parseRefs(line)
