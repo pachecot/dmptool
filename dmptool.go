@@ -9,7 +9,15 @@ import (
 	"github.com/tpacheco/dmptool/cmds/ref"
 )
 
-const version = "0.5.1"
+const version = "0.5.4"
+
+var (
+	// Version is the version of the tool
+	Version = version
+
+	// Date is the build date of the tool
+	Date = ""
+)
 
 func newCmdPE() *cobra.Command {
 	pe := &pe.Command{}
@@ -90,7 +98,7 @@ func newCmdVersion() *cobra.Command {
 		Use:   "version",
 		Short: "print the version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("version:", version)
+			fmt.Printf("version: %s  build date: %s\n", Version, Date)
 		},
 	}
 }
