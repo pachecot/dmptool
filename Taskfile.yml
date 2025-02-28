@@ -1,0 +1,22 @@
+version: '3'
+
+tasks:
+  default: 
+    cmds:    
+      - task: dmptool
+
+  dmptool:
+    deps: [test]
+    sources:
+      - ./*.go
+    generates:
+      - app{{exeExt}}
+    method: timestamp
+    cmds:    
+      - go build -ldflags "-X 'main.Date={{.DATE}}' -v .
+    vars:
+      DATE: '{{now | date "2006-01-02 15:04:05 MST"}}'
+
+  test:
+    cmds:
+      - go test ./...
