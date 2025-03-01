@@ -5,8 +5,8 @@ import (
 	"io"
 )
 
-// maxTokenSize is the for buffer used by the buffio Scanner.
-// Found this to work. Not sure on max size, but default is too small.
+// maxTokenSize is the for buffer used by the bufio Scanner.
+// Found this to work. Not sure on max size, but the default is too small.
 const maxTokenSize = 400000
 
 func scanWith(r io.Reader, p parser) error {
