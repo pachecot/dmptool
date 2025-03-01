@@ -7,13 +7,8 @@ tasks:
 
   dmptool:
     deps: [test]
-    sources:
-      - ./*.go
-    generates:
-      - app{{exeExt}}
-    method: timestamp
     cmds:    
-      - go build -ldflags "-X 'main.Date={{.DATE}}' -v .
+      - go build -ldflags "-X 'main.Date={{.DATE}}'" -v .
     vars:
       DATE: '{{now | date "2006-01-02 15:04:05 MST"}}'
 
