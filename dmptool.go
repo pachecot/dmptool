@@ -9,7 +9,7 @@ import (
 	"github.com/tpacheco/dmptool/cmds/ref"
 )
 
-const version = "0.6.0"
+const version = "0.6.2"
 
 var (
 	// Version is the version of the tool
