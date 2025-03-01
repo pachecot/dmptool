@@ -63,7 +63,7 @@ func newCmdList() *cobra.Command {
 	cc.Flags().StringSliceVarP(&listCmd.Names, "names", "n", []string{}, "filter with matching names")
 	cc.Flags().StringSliceVarP(&listCmd.Devices, "devices", "d", []string{}, "filter with matching device ids / paths")
 	cc.Flags().BoolVarP(&listCmd.Record, "records", "r", false, "list in a record format")
-	cc.Flags().StringSliceVarP(&listCmd.Fields, "fields", "f", []string{"DeviceId", "Name", "Type"}, "fields")
+	cc.Flags().StringSliceVarP(&listCmd.Fields, "fields", "f", []string{"DeviceId", "Name", "Type"}, "list of fields to include")
 	cc.Flags().StringSliceVarP(&listCmd.Types, "types", "t", []string{}, "types filter")
 
 	return cc
