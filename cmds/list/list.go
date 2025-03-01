@@ -107,7 +107,20 @@ func (cmd *Command) Execute() {
 	case csvExt:
 		writeCSV(cmd.OutFile, cmd, table)
 	default:
-		writeFile(os.Stdout, cmd, table)
+		w := os.Stdout
+		if cmd.OutFile != "" {
+			f, err := os.Create(cmd.OutFile)
+			if err != nil {
+				fmt.Println("could not create file")
+				return
+			}
+			defer func() {
+				f.Sync()
+				f.Close()
+			}()
+			w = f
+		}
+		writeFile(w, cmd, table)
 	}
 }
 
