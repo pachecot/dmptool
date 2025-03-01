@@ -26,6 +26,7 @@ type refHandler struct {
 	refs         map[string][]*dmp.Object
 	withGraphics bool
 	withCode     bool
+	withAlarms   bool
 }
 
 func isValid(r rune) bool {
@@ -97,6 +98,22 @@ func (h *refHandler) Object(do *dmp.Object) {
 			}
 			return
 		}
+
+	default:
+		if !h.withAlarms {
+			return
+		}
+		if links, ok := do.Properties["AlarmLinks"]; ok {
+			alarms := dmp.ParseAlarmLinks(links)
+			for _, alarm := range alarms {
+				if alarm == nil {
+					continue
+				}
+				r := alarm.Path
+				h.refs[r] = append(h.refs[r], do)
+			}
+			return
+		}
 	}
 }
 
@@ -108,6 +125,7 @@ type Command struct {
 	Sources  bool
 	ShowType bool
 	Graphics bool
+	Alarms   bool
 	Code     bool
 }
 
@@ -117,6 +135,7 @@ func (cmd *Command) Execute() {
 		refs:         make(map[string][]*dmp.Object),
 		withGraphics: cmd.Graphics,
 		withCode:     cmd.Code,
+		withAlarms:   cmd.Alarms,
 	}
 
 	dmpPath := dmp.ParseFile(cmd.FileName, h)

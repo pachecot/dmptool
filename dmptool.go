@@ -9,7 +9,7 @@ import (
 	"github.com/tpacheco/dmptool/cmds/ref"
 )
 
-const version = "0.6.3"
+const version = "0.6.4"
 
 var (
 	// Version is the version of the tool
@@ -74,22 +74,43 @@ func newCmdList() *cobra.Command {
 func newCmdRef() *cobra.Command {
 	cmdRef := &ref.Command{}
 	cc := &cobra.Command{
-		Use:     "ref <dump file>",
-		Short:   "list external references in the dump file",
+		Use:   "ref <dump file>",
+		Short: "list external references in the dump file",
+		Long: `This command will list all the external references in the dump file. The references
+can be filtered by the type of reference. The output can be written to a file in csv or xlsx format.
+
+If the --all flag is set, all the internal and external references will be listed.
+
+If the --bare flag is set, only the references will be listed to the console. 
+
+If the --code, --graphics, or --alarms flags are set, the references will be filtered by the type of reference.
+The flags can be combined to include multiple types of references. If none of the flags are set, then just the 
+code references will be listed.
+
+If the --source flag is set, the source path will be included in the output.
+
+The output file can be specified with the --output flag. If the file extension is .csv, then the output will be in csv format.
+If the file extension is .xlsx, then the output will be in xlsx format. If the file extension is not recognized, then the output
+will be written as a text. If the output is not specified then the output is to stout.
+`,
 		Args:    cobra.MinimumNArgs(1),
 		Aliases: []string{"references", "refs"},
 		Run: func(cmd *cobra.Command, args []string) {
+			if !(cmdRef.Code || cmdRef.Graphics || cmdRef.Alarms) {
+				cmdRef.Code = true
+			}
 			cmdRef.FileName = args[0]
 			cmdRef.Execute()
 		},
 	}
 
-	cc.Flags().StringVarP(&cmdRef.OutFile, "output", "o", "", "output file to write to")
+	cc.Flags().StringVarP(&cmdRef.OutFile, "output", "o", "", "output file to write to. default is stdout")
 	cc.Flags().BoolVarP(&cmdRef.Bare, "bare", "b", false, "return just the references")
 	cc.Flags().BoolVarP(&cmdRef.All, "all", "a", false, "return all the references")
 	cc.Flags().BoolVarP(&cmdRef.Sources, "source", "s", false, "show the source path")
-	cc.Flags().BoolVarP(&cmdRef.Code, "code", "c", true, "include the script code")
-	cc.Flags().BoolVarP(&cmdRef.Graphics, "graphics", "g", false, "include the graphics")
+	cc.Flags().BoolVarP(&cmdRef.Code, "code", "c", false, "include the script code sources (default)")
+	cc.Flags().BoolVarP(&cmdRef.Graphics, "graphics", "g", false, "include the graphics sources")
+	cc.Flags().BoolVarP(&cmdRef.Alarms, "alarms", "l", false, "include the alarm link sources")
 	cc.Flags().BoolVarP(&cmdRef.ShowType, "typename", "t", false, "show typename in path")
 
 	return cc
