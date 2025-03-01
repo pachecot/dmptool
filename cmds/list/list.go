@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/tpacheco/dmptool/dmp"
@@ -86,6 +87,18 @@ func (cmd *Command) Execute() {
 
 	dmp.ParseFile(cmd.FileName, h)
 
+	switch len(cmd.Fields) {
+	case 0:
+		processFields(h)
+		return
+	case 1:
+		switch cmd.Fields[0] {
+		case "?", "-", "*":
+			processFields(h)
+			return
+		}
+	}
+
 	table := buildTable(cmd, h)
 
 	switch strings.ToLower(path.Ext(cmd.OutFile)) {
@@ -95,6 +108,27 @@ func (cmd *Command) Execute() {
 		writeCSV(cmd.OutFile, cmd, table)
 	default:
 		writeFile(os.Stdout, cmd, table)
+	}
+}
+
+func listFields(h *listHandler) []string {
+	fields := make(map[string]struct{})
+	for _, obj := range h.results {
+		for k := range obj.Properties {
+			fields[k] = struct{}{}
+		}
+	}
+	names := make([]string, 0, len(fields))
+	for k := range fields {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func processFields(h *listHandler) {
+	for _, name := range listFields(h) {
+		fmt.Println(name)
 	}
 }
 
