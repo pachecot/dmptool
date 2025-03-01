@@ -101,5 +101,14 @@ func (cmd *Command) Execute() {
 		separator:  cmd.FlattenSep,
 	}
 
+	if cmd.OutDir == "" {
+		d, err := os.Getwd()
+		if err != nil {
+			fmt.Println("could not get current directory")
+			return
+		}
+		h.destDir = d
+	}
+
 	dmp.ParseFile(cmd.FileName, h)
 }

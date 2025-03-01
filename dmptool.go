@@ -9,7 +9,7 @@ import (
 	"github.com/tpacheco/dmptool/cmds/ref"
 )
 
-const version = "0.6.2"
+const version = "0.6.3"
 
 var (
 	// Version is the version of the tool
@@ -23,13 +23,15 @@ func newCmdPE() *cobra.Command {
 	pe := &pe.Command{}
 
 	cc := &cobra.Command{
-		Use:     "pe <dump file> <output directory>",
+		Use:     "pe <dump file> [output directory]",
 		Short:   "extracts all PE program files into individual files",
 		Aliases: []string{"script", "code", "programs"},
-		Args:    cobra.MinimumNArgs(2),
+		Args:    cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			pe.FileName = args[0]
-			pe.OutDir = args[1]
+			if len(args) > 1 {
+				pe.OutDir = args[1]
+			}
 			pe.Execute()
 		},
 	}
