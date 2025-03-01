@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/tpacheco/dmptool/dmp"
+	"github.com/xuri/excelize/v2"
 )
 
 type listHandler struct {
@@ -21,6 +22,11 @@ type listHandler struct {
 	devices []string
 	results []*dmp.Object
 }
+
+const (
+	csvExt  = ".csv"
+	xlsxExt = ".xlsx"
+)
 
 func (h *listHandler) Object(do *dmp.Object) {
 	if len(h.types) > 0 && !slices.Contains(h.types, do.Type) {
@@ -80,34 +86,22 @@ func (cmd *Command) Execute() {
 
 	dmp.ParseFile(cmd.FileName, h)
 
-	w := os.Stdout
+	table := buildTable(cmd, h)
 
-	csvFormat := false
-
-	if cmd.OutFile != "" {
-		var err error
-		w, err = os.Create(cmd.OutFile)
-		if err != nil {
-			fmt.Println("could not create file")
-			return
-		}
-		defer func() {
-			w.Sync()
-			w.Close()
-		}()
-
-		csvFormat = strings.ToLower(path.Ext(cmd.OutFile)) == ".csv"
+	switch strings.ToLower(path.Ext(cmd.OutFile)) {
+	case xlsxExt:
+		writeXlsx(cmd.OutFile, cmd, table)
+	case csvExt:
+		writeCSV(cmd.OutFile, cmd, table)
+	default:
+		writeFile(os.Stdout, cmd, table)
 	}
+}
+
+func buildTable(cmd *Command, h *listHandler) [][]string {
 
 	cols := len(cmd.Fields)
-	ws := make([]int, cols)
 	table := make([][]string, 0, len(h.results))
-
-	for i, n := range cmd.Fields {
-		if ws[i] < len(n) {
-			ws[i] = len(n)
-		}
-	}
 
 	for _, obj := range h.results {
 		row := make([]string, cols)
@@ -115,33 +109,21 @@ func (cmd *Command) Execute() {
 		for i, n := range cmd.Fields {
 			if n == "Name" {
 				row[i] = obj.Name
-				if ws[i] < len(obj.Name) {
-					ws[i] = len(obj.Name)
-				}
 				continue
 			}
 			if p, ok := obj.Properties[n]; ok {
 				row[i] = p
-				if ws[i] < len(p) {
-					ws[i] = len(p)
-				}
 			}
 		}
 	}
+	return table
+}
 
-	if csvFormat {
-		csvW := csv.NewWriter(w)
-		if err := csvW.Write(cmd.Fields); err != nil {
-			log.Fatalln("error writing record to csv:", err)
-		}
-		for _, row := range table {
-			if err := csvW.Write(row); err != nil {
-				log.Fatalln("error writing record to csv:", err)
-			}
-		}
-		csvW.Flush()
-		return
-	}
+func writeFile(w *os.File, cmd *Command, table [][]string) {
+
+	cols := len(cmd.Fields)
+
+	ws := widths(cmd, table)
 
 	formats := make([]string, cols)
 	for i, w := range ws {
@@ -167,5 +149,73 @@ func (cmd *Command) Execute() {
 			fmt.Fprintf(w, formats[i], t)
 		}
 		fmt.Fprintln(w)
+	}
+}
+
+func widths(cmd *Command, table [][]string) []int {
+	cols := len(cmd.Fields)
+	ws := make([]int, cols)
+	for i, n := range cmd.Fields {
+		if ws[i] < len(n) {
+			ws[i] = len(n)
+		}
+	}
+	for _, row := range table {
+		for i, n := range row {
+			if ws[i] < len(n) {
+				ws[i] = len(n)
+			}
+		}
+	}
+	return ws
+}
+
+func writeCSV(fileName string, cmd *Command, table [][]string) {
+
+	w, err := os.Create(fileName)
+	if err != nil {
+		fmt.Println("could not create file")
+		return
+	}
+	defer func() {
+		w.Sync()
+		w.Close()
+	}()
+
+	csvW := csv.NewWriter(w)
+	if err := csvW.Write(cmd.Fields); err != nil {
+		log.Fatalln("error writing record to csv:", err)
+	}
+
+	for _, row := range table {
+		if err := csvW.Write(row); err != nil {
+			log.Fatalln("error writing record to csv:", err)
+		}
+	}
+	csvW.Flush()
+}
+
+func writeXlsx(fName string, cmd *Command, table [][]string) {
+
+	ws := widths(cmd, table)
+
+	f := excelize.NewFile()
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	for i, col := range ws {
+		f.SetColWidth("Sheet1", fmt.Sprintf("%c", 'A'+i), fmt.Sprintf("%c", 'A'+i), float64(col))
+	}
+
+	f.SetSheetRow("Sheet1", "A1", &cmd.Fields)
+	for i, row := range table {
+		f.SetSheetRow("Sheet1", fmt.Sprintf("%c%d", 'A', i+2), &row)
+	}
+
+	if err := f.SaveAs(fName); err != nil {
+		fmt.Println(err)
 	}
 }
