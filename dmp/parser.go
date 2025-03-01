@@ -1,10 +1,12 @@
 package dmp
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -388,4 +390,34 @@ func Parse(r io.Reader, h Handler) string {
 	}
 
 	return p.devPath
+}
+
+func ParseAlarmLinks(s string) []*AlarmLink {
+
+	alarms := make([]*AlarmLink, 0)
+	scanner := bufio.NewScanner(strings.NewReader(s))
+	for scanner.Scan() {
+		fields := strings.Split(scanner.Text(), ":")
+		if len(fields) != 3 {
+			continue
+		}
+		fields[0] = strings.TrimSpace(fields[0])
+		fields[1] = strings.TrimSpace(fields[1])
+		fields[2] = strings.TrimSpace(fields[2])
+
+		id, err := strconv.Atoi(fields[1])
+		if err != nil {
+			continue
+		}
+
+		for len(alarms) < id {
+			alarms = append(alarms, nil)
+		}
+		alarms[id-1] = &AlarmLink{
+			Id:      id,
+			Path:    fields[0],
+			Enabled: fields[2] == "Enabled",
+		}
+	}
+	return alarms
 }

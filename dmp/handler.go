@@ -64,3 +64,10 @@ type Dictionary struct {
 	Path   string
 	Tables []*Table
 }
+
+// AlarmLink is the structure for the AlarmLink entries
+type AlarmLink struct {
+	Id      int
+	Path    string
+	Enabled bool
+}
