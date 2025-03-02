@@ -388,7 +388,6 @@ func Parse(r io.Reader, h Handler) string {
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
-
 	return p.devPath
 }
 
@@ -401,15 +400,13 @@ func ParseAlarmLinks(s string) []*AlarmLink {
 		if len(fields) != 3 {
 			continue
 		}
-		fields[0] = strings.TrimSpace(fields[0])
-		fields[1] = strings.TrimSpace(fields[1])
-		fields[2] = strings.TrimSpace(fields[2])
-
+		for i := range fields {
+			fields[i] = strings.TrimSpace(fields[i])
+		}
 		id, err := strconv.Atoi(fields[1])
 		if err != nil {
 			continue
 		}
-
 		for len(alarms) < id {
 			alarms = append(alarms, nil)
 		}
