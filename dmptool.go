@@ -23,8 +23,33 @@ func newCmdPE() *cobra.Command {
 	pe := &pe.Command{}
 
 	cc := &cobra.Command{
-		Use:     "pe <dump file> [output directory]",
-		Short:   "extracts all PE program files into individual files",
+		Use:   "pe <dump file> [output directory]",
+		Short: "extracts all PE program files into individual files",
+		Long: `This command will extract all the PE program files from the dump file. 
+
+The PE program files will be written to the output directory. The output directory 
+can be specified as the second argument. If the, output directory is not specified, 
+then the files will be written to the current directory. 
+
+A directory will be created for each object. The directory will be named with the 
+device path of the object. The PE program file will be written to the directory. 
+The PE program file will be named with the object name and the extension .pe.
+
+The output files can be flattened to a single name. If the --flatten flag is set, 
+then the file path will be flattened to a single name. The separator used to flatten 
+the file path can be specified with the --separator flag. The default separator is "~". 
+
+The output files can be organized by the type of object. If the --type flag is set, 
+then the files will be organized by the type of object. The type of object will be used 
+as a sub folder for the files.
+
+The --prefix flag set a prefix for the type folders. The default prefix is "__". 
+
+		DeviceName
+			__Program
+			__InfinityProgram
+			__InfinityFunction
+`,
 		Aliases: []string{"script", "code", "programs"},
 		Args:    cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -50,8 +75,42 @@ func newCmdList() *cobra.Command {
 	listCmd := &list.Command{}
 
 	cc := &cobra.Command{
-		Use:     "list <dump file>",
-		Short:   "extracts list of objects into list",
+		Use:   "list <dump file>",
+		Short: "extracts list of objects into list",
+		Long: `This command will extract the list of objects from the dump file. The list can be filtered by the type of object,
+the name of the object, the device id or path, and the properties of the object. The output can be written to a file in csv or xlsx format.	
+
+The output file can be specified with the --output flag. If the file extension is .csv, then the output will be in csv format.
+If the file extension is .xlsx, then the output will be in xlsx format. If the file extension is not recognized, then the output
+will be written as a text. If the output is not specified then the output is to stout.
+
+The fields to include in the output can be specified with the --fields flag. The default fields are DeviceId, Name, and Type. The fields
+can be any of the properties of the object. The fields can be specified multiple times to include multiple fields. The fields can also be
+specified with the --fields flag in the format of "field1,field2,field3".
+
+The types of objects to include in the output can be specified with the --types flag. The types can be specified multiple times to include
+multiple types. The types can also be specified with the --types flag in the format of "type1,type2,type3".
+
+The names of the objects to include in the output can be specified with the --names flag. The names can be specified multiple times to include
+multiple names. The names can also be specified with the --names flag in the format of "name1,name2,name3". The names are matched with the Name
+property of the object.
+
+The device ids or paths of the objects to include in the output can be specified with the --devices flag. The device ids or paths can be specified
+multiple times to include multiple device ids or paths. The device ids or paths can also be specified with the --devices flag in the format of
+"device1,device2,device3". The device ids or paths are matched with the Path property of the object. The device ids or paths can be partial matches.
+
+The properties of the objects to include in the output can be specified with the --where flag. The where filter can be specified multiple times to
+include multiple filters. The where filter can also be specified with the --where flag in the format of "field1 op1 value1,field2 op2 value2,field3 op3 value3".
+The where filter can be used to filter the objects based on the properties of the object. The where filter can be used to filter the objects based on
+the properties of the object. The operators that can be used are "=", ">", "<", ">=", "<=", "like", and "@". The "like" operator is used to match a
+substring of the property value. The "@" operator is used to match a substring of the Name or Path properties. The where filter can be used to filter
+the objects based on the properties of the object. The where filter can be used to filter the objects based on the properties of the object. The operators
+that can be used are "=", ">", "<", ">=", "<=", "like", and "@". The "like" operator is used to match a substring of the property value. The "@" operator
+is used to match a substring of the Name or Path properties. The where filter can be used to filter the objects based on the properties of the object. The
+where filter can be used to filter the objects based on the properties of the object. The operators that can be used are "=", ">", "<", ">=", "<=", and "like".
+The "like" operator is used to match a substring of the property value. If no operator is used the parameter will try to match the substring of the Name and Path
+ properties.
+`,
 		Aliases: []string{},
 		Args:    cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -64,7 +123,6 @@ func newCmdList() *cobra.Command {
 	cc.Flags().StringSliceVarP(&listCmd.Filters, "where", "w", []string{}, "where like filter")
 	cc.Flags().StringSliceVarP(&listCmd.Names, "names", "n", []string{}, "filter with matching names")
 	cc.Flags().StringSliceVarP(&listCmd.Devices, "devices", "d", []string{}, "filter with matching device ids / paths")
-	cc.Flags().BoolVarP(&listCmd.Record, "records", "r", false, "list in a record format")
 	cc.Flags().StringSliceVarP(&listCmd.Fields, "fields", "f", []string{"DeviceId", "Name", "Type"}, "list of fields to include")
 	cc.Flags().StringSliceVarP(&listCmd.Types, "types", "t", []string{}, "types filter")
 
