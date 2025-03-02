@@ -47,16 +47,15 @@ func (h *listHandler) Object(do *dmp.Object) {
 	}
 
 	if len(h.filters) > 0 && !slices.ContainsFunc(h.filters, func(f string) bool {
-		if i := strings.Index(f, "="); i > 0 {
-			k := strings.TrimSpace(f[:i])
-			v := strings.TrimSpace(f[i+1:])
-			p, ok := do.Properties[k]
-			if !ok {
-				return false
-			}
-			return p == v || strings.Contains(p, v)
+		k, op, v := parseWhere(f)
+		switch op {
+		case "like":
+			return isLike(do.Properties[k], v)
+		case "@":
+			return strings.Contains(do.Name, f) || strings.Contains(do.Path, f)
+		default:
+			return compareWith(op, do.Properties[k], v)
 		}
-		return strings.Contains(do.Name, f) || strings.Contains(do.Path, f)
 	}) {
 		return
 	}
@@ -72,7 +71,6 @@ type Command struct {
 	Filters  []string
 	Names    []string
 	Devices  []string
-	Record   bool
 }
 
 func (cmd *Command) Execute() {
