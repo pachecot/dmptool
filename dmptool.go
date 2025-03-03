@@ -7,9 +7,10 @@ import (
 	"github.com/tpacheco/dmptool/cmds/list"
 	"github.com/tpacheco/dmptool/cmds/pe"
 	"github.com/tpacheco/dmptool/cmds/ref"
+	"github.com/tpacheco/dmptool/cmds/tree"
 )
 
-const version = "0.6.4"
+const version = "0.6.5"
 
 var (
 	// Version is the version of the tool
@@ -174,6 +175,22 @@ will be written as a text. If the output is not specified then the output is to 
 	return cc
 }
 
+func newCmdTree() *cobra.Command {
+	cmdTree := &tree.Command{}
+	cc := &cobra.Command{
+		Use:   "tree <dump file>",
+		Short: "display the object tree",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdTree.FileName = args[0]
+			cmdTree.Execute()
+		},
+	}
+
+	cc.Flags().StringVarP(&cmdTree.OutFile, "output", "o", "", "output file to write to. default is stdout")
+	return cc
+}
+
 func newCmdVersion() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
@@ -194,6 +211,7 @@ func main() {
 	cc.AddCommand(
 		newCmdPE(),
 		newCmdRef(),
+		newCmdTree(),
 		newCmdList(),
 		newCmdVersion(),
 	)
