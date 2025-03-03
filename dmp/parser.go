@@ -19,6 +19,12 @@ const (
 	prop_members      = "Members"
 	prop_path         = "Path"
 
+	tag_container       = "Container"
+	tag_container_begin = "BeginContainer"
+	tag_container_end   = "EndContainer"
+	tag_device          = "Device"
+	tag_device_end      = "EndDevice"
+
 	tag_controller       = "Controller"
 	tag_controller_begin = "BeginController"
 	tag_controller_end   = "EndController"
@@ -41,17 +47,41 @@ type parser interface {
 	parse(*token) parser
 }
 
+type state struct {
+	alias map[string]string
+}
+
 type dmpParser struct {
-	path    string
 	name    string
+	path    string
 	devPath string
 	h       Handler
+	s       *state
 }
+
+func newParser(h Handler) *dmpParser {
+	return &dmpParser{
+		h: h,
+		s: &state{
+			alias: map[string]string{},
+		},
+	}
+}
+
 type infControllerParser struct {
 	prev parser
 	name string
 	path string
 	h    Handler
+	s    *state
+}
+
+type deviceParser struct {
+	prev parser
+	name string
+	path string
+	h    Handler
+	s    *state
 }
 
 type controllerParser struct {
@@ -59,6 +89,15 @@ type controllerParser struct {
 	name string
 	path string
 	h    Handler
+	s    *state
+}
+
+type containerParser struct {
+	last parser
+	name string
+	path string
+	h    Handler
+	s    *state
 }
 
 type dictionaryParser struct {
@@ -67,11 +106,13 @@ type dictionaryParser struct {
 	path   string
 	tables []*Table
 	h      Handler
+	s      *state
 }
 
 type tableParser struct {
 	prev  *dictionaryParser
 	table *Table
+	s     *state
 }
 
 type objectParser struct {
@@ -79,11 +120,13 @@ type objectParser struct {
 	lastProp string
 	h        Handler
 	obj      *Object
+	s        *state
 }
 
 type codeParser struct {
 	prev  *objectParser
 	lines []string
+	s     *state
 }
 
 type blockParser struct {
@@ -92,6 +135,7 @@ type blockParser struct {
 	endTag     string
 	includeEnd bool
 	lines      []string
+	s          *state
 }
 
 func (p *blockParser) parse(tk *token) parser {
@@ -133,15 +177,16 @@ func (p *dictionaryParser) parse(tk *token) parser {
 			h:    p.h,
 			name: values[1],
 			path: filepath.Join(p.path, p.name),
+			s:    p.s,
 		}
 
 	case tag_dictionary_end:
-		p.h.End(tag_dictionary, p.name)
 		p.h.Dictionary(&Dictionary{
 			Path:   p.path,
 			Name:   p.name,
 			Tables: p.tables,
 		})
+		p.h.End(tag_dictionary, p.name)
 		return p.prev
 
 	case "'TYPE":
@@ -151,6 +196,7 @@ func (p *dictionaryParser) parse(tk *token) parser {
 			table: &Table{
 				Header: values,
 			},
+			s: p.s,
 		}
 	}
 	return p
@@ -210,6 +256,16 @@ func (p *objectParser) parse(tk *token) parser {
 			p.obj.Modified = t
 		}
 
+	case "Alias":
+		p.obj.Properties[k] = v
+		p.obj.Alias = v
+		if p.obj.Name != v {
+			// update path with alias
+			pth := filepath.Join(filepath.Dir(p.obj.Path), v)
+			p.s.alias[p.obj.Path] = pth
+			p.obj.Path = pth
+		}
+
 	case "DeviceId":
 		p.obj.Properties[k] = v
 		p.obj.DeviceId = v
@@ -224,6 +280,7 @@ func (p *objectParser) parse(tk *token) parser {
 			name:   p.lastProp,
 			lines:  []string{tk.value},
 			endTag: "EndOfCDT",
+			s:      p.s,
 		}
 
 	case "PanelObjectList":
@@ -232,6 +289,7 @@ func (p *objectParser) parse(tk *token) parser {
 			name:       k,
 			endTag:     "}",
 			includeEnd: true,
+			s:          p.s,
 		}
 
 	case prop_array, prop_members, prop_alarm_links:
@@ -239,11 +297,13 @@ func (p *objectParser) parse(tk *token) parser {
 			prev:   p,
 			name:   k,
 			endTag: "End" + k,
+			s:      p.s,
 		}
 
 	case prop_bytecode:
 		return &codeParser{
 			prev: p,
+			s:    p.s,
 		}
 
 	default:
@@ -260,25 +320,92 @@ func (p *controllerParser) parse(tk *token) parser {
 	switch k {
 	case tag_object:
 		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
 		return &objectParser{
 			prev: p,
 			h:    p.h,
 			obj: &Object{
 				Name: v,
-				Path: filepath.Join(p.path, v),
+				Path: pth,
 			},
+			s: p.s,
 		}
 	case tag_infinet_ctlr:
 		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
 		return &infControllerParser{
 			prev: p,
 			name: v,
-			path: filepath.Join(p.path, v),
+			path: pth,
 			h:    p.h,
+			s:    p.s,
 		}
+	case tag_device:
+		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
+		return &deviceParser{
+			prev: p,
+			name: v,
+			path: pth,
+			h:    p.h,
+			s:    p.s,
+		}
+	case tag_container_end:
+		p.h.End(tag_container, p.name)
+		return p.last
 	case tag_controller_end:
 		p.h.End(tag_controller, p.name)
 		return p.last
+	}
+	return p
+}
+
+func (p *containerParser) parse(tk *token) parser {
+	k, v, _ := split(tk.value)
+	switch k {
+	case tag_object:
+		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
+		return &objectParser{
+			prev: p,
+			h:    p.h,
+			obj: &Object{
+				Name: v,
+				Path: pth,
+			},
+			s: p.s,
+		}
+
+	case tag_device:
+		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
+		return &deviceParser{
+			prev: p,
+			name: v,
+			path: pth,
+			h:    p.h,
+			s:    p.s,
+		}
+
+	case tag_container_end:
+		p.h.End(tag_container, p.name)
+		return p.last
+
 	}
 	return p
 }
@@ -297,43 +424,90 @@ func (p *dmpParser) parse(tk *token) parser {
 	case tag_dictionary:
 		p.h.Begin(k, v)
 		p.devPath = filepath.Join(p.path, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
 		return &dictionaryParser{
 			prev: p,
 			h:    p.h,
 			name: v,
-			path: p.path,
+			path: pth,
+			s:    p.s,
 		}
 
 	case tag_infinet_ctlr:
 		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
 		return &infControllerParser{
 			prev: p,
 			name: v,
-			path: filepath.Join(p.path, v),
+			path: pth,
 			h:    p.h,
+			s:    p.s,
+		}
+
+	case tag_device:
+		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
+		return &deviceParser{
+			prev: p,
+			name: v,
+			path: pth,
+			h:    p.h,
+			s:    p.s,
 		}
 
 	case tag_controller_begin:
 		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
 		return &controllerParser{
 			last: p,
 			name: v,
-			path: filepath.Join(p.path, v),
+			path: pth,
 			h:    p.h,
+			s:    p.s,
+		}
+
+	case tag_container_begin:
+		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
+		return &containerParser{
+			last: p,
+			name: v,
+			path: pth,
+			h:    p.h,
+			s:    p.s,
 		}
 
 	case tag_object:
 		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
 		return &objectParser{
 			prev: p,
 			h:    p.h,
 			obj: &Object{
 				Name: v,
-				Path: filepath.Join(p.path, v),
+				Path: pth,
 			},
+			s: p.s,
 		}
 	}
-
 	return p
 }
 
@@ -342,16 +516,47 @@ func (p *infControllerParser) parse(tk *token) parser {
 	switch k {
 	case tag_object:
 		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
 		return &objectParser{
 			prev: p,
 			h:    p.h,
 			obj: &Object{
 				Name: v,
-				Path: filepath.Join(p.path, v),
+				Path: pth,
 			},
+			s: p.s,
 		}
 	case tag_infinet_ctlr_end:
 		p.h.End(tag_infinet_ctlr, p.name)
+		return p.prev
+	}
+	return p
+}
+
+func (p *deviceParser) parse(tk *token) parser {
+	k, v, _ := split(tk.value)
+	switch k {
+	case tag_object:
+		p.h.Begin(k, v)
+		pth := filepath.Join(p.path, v)
+		if np, ok := p.s.alias[pth]; ok {
+			pth = np
+		}
+		return &objectParser{
+			prev: p,
+			h:    p.h,
+			obj: &Object{
+				Name: v,
+				Path: pth,
+			},
+			s: p.s,
+		}
+
+	case tag_device_end:
+		p.h.End(tag_device, p.name)
 		return p.prev
 	}
 	return p
@@ -368,7 +573,7 @@ func ParseFile(file string, h Handler) string {
 	}
 	defer r.Close()
 
-	p := &dmpParser{h: h}
+	p := newParser(h)
 
 	err = scanWith(r, p)
 	if err != nil {
@@ -382,7 +587,7 @@ func ParseFile(file string, h Handler) string {
 // as the file is parsed events will call the Handler methods.
 func Parse(r io.Reader, h Handler) string {
 
-	p := &dmpParser{h: h}
+	p := newParser(h)
 
 	err := scanWith(r, p)
 	if err != nil {

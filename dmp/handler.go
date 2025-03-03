@@ -1,6 +1,8 @@
 package dmp
 
-import "time"
+import (
+	"time"
+)
 
 // Handler is the interface for the parsing events
 type Handler interface {
@@ -46,6 +48,7 @@ func (h *EmptyHandler) End(tag string, name string)   {}
 type Object struct {
 	Type       string
 	Name       string
+	Alias      string
 	DeviceId   string
 	Path       string
 	Modified   time.Time
@@ -70,4 +73,20 @@ type AlarmLink struct {
 	Id      int
 	Path    string
 	Enabled bool
+}
+
+func ObjectPathCompare(a, b *Object) int {
+	if a.Path < b.Path {
+		return -1
+	}
+	if a.Path > b.Path {
+		return 1
+	}
+	if a.Name < b.Name {
+		return -1
+	}
+	if a.Name > b.Name {
+		return 1
+	}
+	return 0
 }
