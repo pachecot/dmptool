@@ -1,11 +1,13 @@
 package list
 
-import "strings"
+import (
+	"strings"
+)
 
 func parseWhere(f string) (string, string, string) {
 	i := strings.IndexAny(f, "!=<> ")
 	if i < 0 {
-		return f, "@", ""
+		return f, "", ""
 	}
 	k := strings.TrimSpace(f[:i])
 	v := strings.Trim(f[i+1:], "!=<> ")

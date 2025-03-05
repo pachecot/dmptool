@@ -50,8 +50,16 @@ func (h *listHandler) Object(do *dmp.Object) {
 		k, op, v := parseWhere(f)
 		switch op {
 		case "like":
-			return isLike(do.Properties[k], v)
-		case "@":
+			switch k {
+			case "Name":
+				return isLike(do.Name, v)
+			case "DeviceId":
+				return isLike(do.DeviceId, v)
+			default:
+				return isLike(do.Properties[k], v)
+			}
+
+		case "":
 			return strings.Contains(do.Name, f) || strings.Contains(do.Path, f)
 		default:
 			return compareWith(op, do.Properties[k], v)
