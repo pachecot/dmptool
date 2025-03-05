@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 
+	_ "embed"
+
 	"github.com/spf13/cobra"
 	"github.com/tpacheco/dmptool/cmds/list"
 	"github.com/tpacheco/dmptool/cmds/pe"
@@ -10,11 +12,10 @@ import (
 	"github.com/tpacheco/dmptool/cmds/tree"
 )
 
-const version = "0.6.5"
-
 var (
-	// Version is the version of the tool
-	Version = version
+	// version is the version of the tool
+	//go:embed VERSION
+	version string
 
 	// Date is the build date of the tool
 	Date = ""
@@ -196,7 +197,7 @@ func newCmdVersion() *cobra.Command {
 		Use:   "version",
 		Short: "print the version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("version: %s  build date: %s\n", Version, Date)
+			fmt.Printf("version: %s  build date: %s\n", version, Date)
 		},
 	}
 }
