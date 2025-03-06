@@ -1,6 +1,12 @@
 version: '3'
 
+vars:
+  DATE: '{{now | date "2006-01-02 15:04:05 MST"}}'
+
+  LDFLAGS: -ldflags "-X 'main.Date={{.DATE}}'"
+
 tasks:
+
   default: 
     cmds:    
       - task: dmptool
@@ -8,9 +14,7 @@ tasks:
   dmptool:
     deps: [test]
     cmds:    
-      - go build -ldflags "-X 'main.Date={{.DATE}}'" -v .
-    vars:
-      DATE: '{{now | date "2006-01-02 15:04:05 MST"}}'
+      - go build {{.LDFLAGS}} -v .
 
   test:
     cmds:
