@@ -47,7 +47,7 @@ type treeHandler struct {
 	objects     []*dmp.Object
 	rootPath    string
 	currentPath string
-	indent      indent
+	tree        tree
 }
 
 func (h *treeHandler) Dictionary(dd *dmp.Dictionary) {
@@ -83,13 +83,33 @@ type Command struct {
 	FileName string
 	OutFile  string
 	Ascii    bool
+	Depth    int
+	Parents  bool
+}
+
+func prune(n *node) *node {
+	x := len(n.children)
+	if x == 0 {
+		return nil
+	}
+	children := make([]*node, 0, x)
+	for _, c := range n.children {
+		a := prune(c)
+		if a == nil {
+			continue
+		}
+		children = append(children, a)
+	}
+	if len(children) == 0 && n.object == nil {
+		return nil
+	}
+	n.children = children
+	return n
 }
 
 func (cmd *Command) Execute() {
 
-	h := &treeHandler{
-		indent: newIndent(cmd.Ascii),
-	}
+	h := &treeHandler{tree: newTree(cmd.Depth, cmd.Ascii)}
 
 	dmp.ParseFile(cmd.FileName, h)
 
@@ -99,7 +119,11 @@ func (cmd *Command) Execute() {
 	}
 	slices.SortFunc(h.objects, dmp.ObjectPathCompare)
 
-	tree := buildTree(h)
+	root := buildGraph(h)
+	if cmd.Parents {
+		root = prune(root)
+	}
+	view := strings.Split(h.tree.view(root, ""), "\n")
 
 	w := os.Stdout
 	if cmd.OutFile != "" {
@@ -114,42 +138,47 @@ func (cmd *Command) Execute() {
 		}()
 		w = out
 	}
-	writeFile(w, tree)
+	writeFile(w, view)
 }
 
-type indent struct {
-	vt string
-	br string
-	lf string
-	ws string
+type tree struct {
+	vt       string
+	br       string
+	lf       string
+	ws       string
+	indent   string
+	depth    int
+	maxDepth int
 }
 
 const (
-	ansi_vt = `│  `
-	ansi_br = `├──`
-	ansi_lf = `└──`
-	ansi_ws = `   `
+	ansi_vt = `│   `
+	ansi_br = `├───`
+	ansi_lf = `└───`
+	ansi_ws = `    `
 
-	ascii_vt = `|  `
-	ascii_br = `|--`
-	ascii_lf = `\--`
-	ascii_ws = `   `
+	ascii_vt = `|   `
+	ascii_br = `|---`
+	ascii_lf = `\---`
+	ascii_ws = `    `
 )
 
-func newIndent(ascii bool) indent {
+func newTree(maxDepth int, ascii bool) tree {
 	if ascii {
-		return indent{
-			vt: ascii_vt,
-			br: ascii_br,
-			lf: ascii_lf,
-			ws: ascii_ws,
+		return tree{
+			maxDepth: maxDepth,
+			vt:       ascii_vt,
+			br:       ascii_br,
+			lf:       ascii_lf,
+			ws:       ascii_ws,
 		}
 	}
-	return indent{
-		vt: ansi_vt,
-		br: ansi_br,
-		lf: ansi_lf,
-		ws: ansi_ws,
+	return tree{
+		maxDepth: maxDepth,
+		vt:       ansi_vt,
+		br:       ansi_br,
+		lf:       ansi_lf,
+		ws:       ansi_ws,
 	}
 }
 
@@ -164,6 +193,7 @@ func buildGraph(h *treeHandler) *node {
 	nm[rootPath] = root
 
 	for _, o := range h.objects {
+
 		n := &node{
 			name:   o.Name,
 			object: o,
@@ -207,39 +237,38 @@ func buildGraph(h *treeHandler) *node {
 	return root
 }
 
-func (px indent) nodeView(item *node, prefix string, indent string) string {
+func (t tree) view(item *node, prefix string) string {
+	t.depth++
 	cs := item.children
 	ss := make([]string, 0, len(cs)+1)
 	if item.object != nil {
 		io := item.object
 		if len(io.Alias) > 0 && io.Alias != item.name {
-			ss = append(ss, indent+prefix+io.Alias+" ["+item.name+"]")
+			ss = append(ss, t.indent+prefix+io.Alias+" ["+item.name+"]")
 		} else {
-			ss = append(ss, indent+prefix+item.name)
+			ss = append(ss, t.indent+prefix+item.name)
 		}
 	} else {
-		ss = append(ss, indent+prefix+item.name)
+		ss = append(ss, t.indent+prefix+item.name)
 	}
 	switch prefix {
-	case px.lf:
-		indent += px.ws
-	case px.br:
-		indent += px.vt
+	case t.lf:
+		t.indent += t.ws
+	case t.br:
+		t.indent += t.vt
 	}
+	pfx := t.br
+	if t.maxDepth > 0 && t.depth > t.maxDepth {
+		return strings.Join(ss, "\n")
+	}
+
 	for i, c := range cs {
-		pfx := px.br
 		if i == len(cs)-1 {
-			pfx = px.lf
+			pfx = t.lf
 		}
-		ss = append(ss, px.nodeView(c, pfx, indent))
+		ss = append(ss, t.view(c, pfx))
 	}
 	return strings.Join(ss, "\n")
-}
-
-func buildTree(h *treeHandler) []string {
-	root := buildGraph(h)
-	ss := strings.Split(h.indent.nodeView(root, "", ""), "\n")
-	return ss
 }
 
 func writeFile(w *os.File, table []string) {
