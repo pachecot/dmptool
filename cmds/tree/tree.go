@@ -154,7 +154,6 @@ func newIndent(ascii bool) indent {
 }
 
 func buildGraph(h *treeHandler) *node {
-	// rootPath := strings.ReplaceAll(h.rootPath, " ", "")
 	rootPath := h.rootPath
 
 	root := &node{name: h.rootPath}
@@ -185,8 +184,6 @@ func buildGraph(h *treeHandler) *node {
 			}
 			nm[parent] = devNode
 		}
-
-		// id := o.DeviceId
 		id := parent + "/" + o.Type
 		typeNode := nm[id]
 		if typeNode == nil {
@@ -199,14 +196,6 @@ func buildGraph(h *treeHandler) *node {
 		typeNode.children = append(typeNode.children, n)
 
 		items = append(items, n)
-
-		// switch o.Type {
-		// case "Container", "Folder", "Device":
-		// 	dev := filepath.Join(o.DeviceId, o.Name)
-		// 	if _, ok := nm[dev]; !ok {
-		// 		// nm[dev] = typeNode
-		// 	}
-		// }
 	}
 	if root.children == nil {
 		root.children = items
@@ -215,83 +204,6 @@ func buildGraph(h *treeHandler) *node {
 		r.name = h.rootPath
 		root = r
 	}
-	// fmt.Printf("%#v", root.children[1].children[0])
-	return root
-}
-
-func buildGraphS(h *treeHandler) *node {
-	rootPath := strings.ReplaceAll(h.rootPath, " ", "")
-
-	root := &node{name: h.rootPath}
-
-	items := make([]*node, 0, len(h.objects))
-	nm := make(map[string]*node, len(h.objects))
-
-	nm[rootPath] = root
-
-	for _, o := range h.objects {
-		if !strings.HasPrefix(o.DeviceId, rootPath) {
-			b := filepath.Base(rootPath)
-			if strings.HasPrefix(o.DeviceId, b) {
-				o.DeviceId = filepath.Join(filepath.Dir(rootPath), o.DeviceId)
-			}
-		}
-		if !strings.HasPrefix(o.DeviceId, o.Path) {
-			o.Path = filepath.Join(o.DeviceId, filepath.Base(o.Path))
-		}
-	}
-
-	for _, o := range h.objects {
-		n := &node{
-			name:   o.Name,
-			object: o,
-		}
-		pt := o.Path
-		if n2, ok := nm[pt]; ok {
-			n = n2
-			n.object = o
-			n.name = o.Name
-		}
-		nm[pt] = n
-
-		devNode := nm[o.DeviceId]
-		if devNode == nil {
-			devNode = &node{
-				name: o.Type,
-			}
-			nm[o.DeviceId] = devNode
-		}
-
-		// id := o.DeviceId
-		id := o.DeviceId + "/" + o.Type
-		typeNode := nm[id]
-		if typeNode == nil {
-			typeNode = &node{
-				name: o.Type,
-			}
-			nm[id] = typeNode
-			devNode.children = append(devNode.children, typeNode)
-		}
-		typeNode.children = append(typeNode.children, n)
-
-		items = append(items, n)
-
-		// switch o.Type {
-		// case "Container", "Folder", "Device":
-		// 	dev := filepath.Join(o.DeviceId, o.Name)
-		// 	if _, ok := nm[dev]; !ok {
-		// 		// nm[dev] = typeNode
-		// 	}
-		// }
-	}
-	if root.children == nil {
-		root.children = items
-	}
-	if r, ok := nm[h.rootPath]; ok {
-		r.name = h.rootPath
-		root = r
-	}
-	// fmt.Printf("%#v", root.children[1].children[0])
 	return root
 }
 
