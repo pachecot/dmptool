@@ -189,6 +189,7 @@ func newCmdTree() *cobra.Command {
 	}
 
 	cc.Flags().StringVarP(&cmdTree.OutFile, "output", "o", "", "output file to write to. default is stdout")
+	cc.Flags().BoolVarP(&cmdTree.Ascii, "ascii", "a", false, "use ascii characters for tree")
 	return cc
 }
 

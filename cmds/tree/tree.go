@@ -47,6 +47,7 @@ type treeHandler struct {
 	objects     []*dmp.Object
 	rootPath    string
 	currentPath string
+	indent      indent
 }
 
 func (h *treeHandler) Dictionary(dd *dmp.Dictionary) {
@@ -81,11 +82,14 @@ func (h *treeHandler) End(tag string, name string) {
 type Command struct {
 	FileName string
 	OutFile  string
+	Ascii    bool
 }
 
 func (cmd *Command) Execute() {
 
-	h := &treeHandler{}
+	h := &treeHandler{
+		indent: newIndent(cmd.Ascii),
+	}
 
 	dmp.ParseFile(cmd.FileName, h)
 
@@ -113,12 +117,41 @@ func (cmd *Command) Execute() {
 	writeFile(w, tree)
 }
 
+type indent struct {
+	vt string
+	br string
+	lf string
+	ws string
+}
+
 const (
-	indentI = "│  "
-	prefixT = "├──"
-	prefixL = "└──"
-	indentS = "   "
+	ansi_vt = `│  `
+	ansi_br = `├──`
+	ansi_lf = `└──`
+	ansi_ws = `   `
+
+	ascii_vt = `|  `
+	ascii_br = `|--`
+	ascii_lf = `\--`
+	ascii_ws = `   `
 )
+
+func newIndent(ascii bool) indent {
+	if ascii {
+		return indent{
+			vt: ascii_vt,
+			br: ascii_br,
+			lf: ascii_lf,
+			ws: ascii_ws,
+		}
+	}
+	return indent{
+		vt: ansi_vt,
+		br: ansi_br,
+		lf: ansi_lf,
+		ws: ansi_ws,
+	}
+}
 
 func buildGraph(h *treeHandler) *node {
 	// rootPath := strings.ReplaceAll(h.rootPath, " ", "")
@@ -262,7 +295,7 @@ func buildGraphS(h *treeHandler) *node {
 	return root
 }
 
-func nodeView(item *node, prefix string, indent string) string {
+func (px indent) nodeView(item *node, prefix string, indent string) string {
 	cs := item.children
 	ss := make([]string, 0, len(cs)+1)
 	if item.object != nil {
@@ -276,24 +309,24 @@ func nodeView(item *node, prefix string, indent string) string {
 		ss = append(ss, indent+prefix+item.name)
 	}
 	switch prefix {
-	case prefixL:
-		indent += indentS
-	case prefixT:
-		indent += indentI
+	case px.lf:
+		indent += px.ws
+	case px.br:
+		indent += px.vt
 	}
 	for i, c := range cs {
-		pfx := prefixT
+		pfx := px.br
 		if i == len(cs)-1 {
-			pfx = prefixL
+			pfx = px.lf
 		}
-		ss = append(ss, nodeView(c, pfx, indent))
+		ss = append(ss, px.nodeView(c, pfx, indent))
 	}
 	return strings.Join(ss, "\n")
 }
 
 func buildTree(h *treeHandler) []string {
 	root := buildGraph(h)
-	ss := strings.Split(nodeView(root, "", ""), "\n")
+	ss := strings.Split(h.indent.nodeView(root, "", ""), "\n")
 	return ss
 }
 
