@@ -12,8 +12,10 @@ import (
 
 type node struct {
 	name     string
+	prefix   string
 	object   *dmp.Object
 	children []*node
+	parent   *node
 }
 
 func (n *node) Name() string {
@@ -80,11 +82,12 @@ func (h *treeHandler) End(tag string, name string) {
 }
 
 type Command struct {
-	FileName string
-	OutFile  string
-	Ascii    bool
-	Depth    int
-	Parents  bool
+	FileName    string
+	OutFile     string
+	Ascii       bool
+	Depth       int
+	Parents     bool
+	Interactive bool
 }
 
 func prune(n *node) *node {
@@ -123,7 +126,14 @@ func (cmd *Command) Execute() {
 	if cmd.Parents {
 		root = prune(root)
 	}
-	view := strings.Split(h.tree.view(root, ""), "\n")
+	if cmd.Interactive {
+		items := h.tree.create(root, "")
+		v := newView(cmd.FileName, items)
+		v.run()
+		return
+	}
+
+	text := strings.Split(h.tree.view(root, ""), "\n")
 
 	w := os.Stdout
 	if cmd.OutFile != "" {
@@ -138,7 +148,7 @@ func (cmd *Command) Execute() {
 		}()
 		w = out
 	}
-	writeFile(w, view)
+	writeFile(w, text)
 }
 
 type tree struct {
@@ -218,12 +228,14 @@ func buildGraph(h *treeHandler) *node {
 		typeNode := nm[id]
 		if typeNode == nil {
 			typeNode = &node{
-				name: o.Type,
+				name:   o.Type,
+				parent: devNode,
 			}
 			nm[id] = typeNode
 			devNode.children = append(devNode.children, typeNode)
 		}
 		typeNode.children = append(typeNode.children, n)
+		n.parent = typeNode
 
 		items = append(items, n)
 	}
@@ -237,20 +249,19 @@ func buildGraph(h *treeHandler) *node {
 	return root
 }
 
+func (n *node) view() string {
+	if io := n.object; io != nil && len(io.Alias) > 0 && io.Alias != n.name {
+		return n.prefix + io.Alias + " [" + n.name + "]"
+	}
+	return n.prefix + n.name
+}
+
 func (t tree) view(item *node, prefix string) string {
 	t.depth++
 	cs := item.children
 	ss := make([]string, 0, len(cs)+1)
-	if item.object != nil {
-		io := item.object
-		if len(io.Alias) > 0 && io.Alias != item.name {
-			ss = append(ss, t.indent+prefix+io.Alias+" ["+item.name+"]")
-		} else {
-			ss = append(ss, t.indent+prefix+item.name)
-		}
-	} else {
-		ss = append(ss, t.indent+prefix+item.name)
-	}
+	item.prefix = t.indent + prefix
+	ss = append(ss, item.view())
 	switch prefix {
 	case t.lf:
 		t.indent += t.ws
@@ -261,7 +272,6 @@ func (t tree) view(item *node, prefix string) string {
 	if t.maxDepth > 0 && t.depth > t.maxDepth {
 		return strings.Join(ss, "\n")
 	}
-
 	for i, c := range cs {
 		if i == len(cs)-1 {
 			pfx = t.lf
@@ -269,6 +279,31 @@ func (t tree) view(item *node, prefix string) string {
 		ss = append(ss, t.view(c, pfx))
 	}
 	return strings.Join(ss, "\n")
+}
+
+func (t tree) create(item *node, prefix string) []*node {
+	t.depth++
+	cs := item.children
+	items := make([]*node, 0, len(cs)+1)
+	item.prefix = t.indent + prefix
+	items = append(items, item)
+	switch prefix {
+	case t.lf:
+		t.indent += t.ws
+	case t.br:
+		t.indent += t.vt
+	}
+	pfx := t.br
+	if t.maxDepth > 0 && t.depth > t.maxDepth {
+		return items
+	}
+	for i, c := range cs {
+		if i == len(cs)-1 {
+			pfx = t.lf
+		}
+		items = append(items, t.create(c, pfx)...)
+	}
+	return items
 }
 
 func writeFile(w *os.File, table []string) {

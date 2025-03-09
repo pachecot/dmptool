@@ -1,11 +1,14 @@
 module github.com/tpacheco/dmptool
 
-go 1.23
+go 1.23.0
+
+toolchain go1.24.0
 
 require (
 	github.com/spf13/cobra v1.7.0
 	github.com/xuri/excelize/v2 v2.9.0
 	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
+	golang.org/x/sys v0.31.0
 )
 
 require (

@@ -191,6 +191,7 @@ func newCmdTree() *cobra.Command {
 	cc.Flags().StringVarP(&cmdTree.OutFile, "output", "o", "", "output file to write to. default is stdout")
 	cc.Flags().BoolVarP(&cmdTree.Ascii, "ascii", "a", false, "use ascii characters for tree")
 	cc.Flags().BoolVarP(&cmdTree.Parents, "parents", "p", false, "container objects only")
+	cc.Flags().BoolVarP(&cmdTree.Interactive, "shell", "s", false, "page results in shell")
 	cc.Flags().IntVarP(&cmdTree.Depth, "depth", "n", 0, "max depth of tree")
 	return cc
 }
