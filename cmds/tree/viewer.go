@@ -54,15 +54,9 @@ func (v *view) run() {
 		return
 	}
 	v.resize(*sz)
-	if len(v.data) < v.height {
-		return
-	}
 	listener := t.Open()
 
 	for {
-		if len(v.data) < v.height {
-			return
-		}
 		select {
 		case evt, ok := <-listener.KeyEvents:
 			if !ok {
@@ -72,19 +66,44 @@ func (v *view) run() {
 			case cmd_Quit:
 				return
 			case cmd_Dn:
-				v.write(1)
+				if v.pos < len(v.data)-(v.height-v.data[v.pos].depth) {
+					v.pos++
+					v.redraw()
+				}
 			case cmd_PgDn:
-				v.write(v.height)
+				// rotate up until the last item is the first
+				m := v.pos + (v.height - v.data[v.pos].depth)
+				for v.pos < len(v.data)-(v.height-v.data[v.pos].depth) && v.pos < m {
+					v.pos++
+				}
+				v.redraw()
 			case cmd_PgUp:
-				v.write(-v.height)
+				// rotate down until the first item is the last
+				m := v.pos
+				for v.pos > 0 && v.pos+(v.height-v.data[v.pos].depth) > m {
+					v.pos--
+				}
+				v.redraw()
 			case cmd_Up:
-				v.write(-1)
+				if v.pos > 0 {
+					v.pos--
+					v.redraw()
+				}
 			case cmd_Home:
-				v.pos = 0
-				v.write(v.height)
+				if v.pos > 0 {
+					v.pos = 0
+					v.redraw()
+				}
 			case cmd_End:
-				v.pos = len(v.data) - v.height
-				v.write(v.height)
+				n := len(v.data)
+				last := n - v.height
+				for last < n-(v.height-v.data[last].depth) {
+					last++
+				}
+				if v.pos != last {
+					v.pos = last
+					v.redraw()
+				}
 			}
 		case sz, ok := <-listener.ResizeEvents:
 			if !ok {
@@ -98,21 +117,31 @@ func (v *view) run() {
 }
 
 func (v *view) resize(sz terminal.Size) {
-	v.pos -= v.height
-	if v.pos < 0 {
-		v.pos = 0
-	}
 	v.window.width = sz.Width
 	v.window.height = sz.Height
 	v.height = sz.Height - 1
+	v.out.WriteString(eraseDisplay)
 	v.redraw()
 }
 
 func (v *view) redraw() {
-	for i := 0; v.pos < len(v.data) && i < v.height; i++ {
-		v.out.WriteString(v.data[v.pos].view())
+	row := 1
+	n := len(v.data)
+	if v.height > len(v.data) {
+		v.pos = 0
+	} else {
+		row = v.data[v.pos].depth
+		n = v.height - row + 1
+		if v.pos+n > len(v.data) {
+			v.pos = len(v.data) - n
+		}
+	}
+	v.header()
+	v.out.WriteString(fmt.Sprintf(fCUP, row))
+	for i := range n {
+		v.out.WriteString(eraseLine)
+		v.out.WriteString(v.data[v.pos+i].view())
 		v.out.WriteString(LF)
-		v.pos++
 	}
 	v.menu()
 }
@@ -124,53 +153,41 @@ func (v *view) menu() {
 	v.out.WriteString(strings.Repeat(" ", v.window.width))
 	v.out.WriteString(CR)
 	v.out.WriteString(" Enter ESC or q to Exit || Navigation: Space/PgDn, PgUp, Up-Arrow, Down-Arrow ")
-	pct := fmt.Sprintf("%.1f%% ", (100.0*float32(v.pos))/float32(len(v.data)))
+	n := v.pos + v.height
+	if n > len(v.data) {
+		n = len(v.data)
+	}
+	pct := fmt.Sprintf("%.1f%% ", (100.0*float32(n))/float32(len(v.data)))
 	v.out.WriteString(fmt.Sprintf(fCUPos, v.window.width, v.window.width-len(pct)))
 	v.out.WriteString(pct)
 	v.out.WriteString(sgrReset)
 }
 
-func (v *view) header() {
-	v.out.WriteString(sgrReverse)
-	v.out.WriteString(strings.Repeat(" ", v.window.width))
-	v.out.WriteString(CR)
-	v.out.WriteString(" ")
-	v.out.WriteString(sgrReset)
+func parents(n *node) []*node {
+	if n == nil {
+		return nil
+	}
+	return append(parents(n.parent), n)
 }
 
-func (v *view) write(n int) {
-	if n == 0 {
+func (v *view) header() {
+	if v.pos == 0 {
 		return
 	}
-	if n < 0 {
-		if v.pos > 0 && v.pos <= v.height {
-			return
-		}
-		v.out.WriteString(scrollDN)
-		v.out.WriteString(fmt.Sprintf(fCUP, 1))
-		v.pos--
-		pos := v.pos - v.height
-		v.out.WriteString(v.data[pos].view())
-		if n < 0 {
-			v.write(n + 1)
-		}
-		v.out.WriteString(fmt.Sprintf(fCUP, v.height+1))
+	first := v.data[v.pos]
+	v.out.WriteString(fmt.Sprintf(fCUP, 1))
+	for _, p := range parents(first.parent) {
 		v.out.WriteString(eraseLine)
-		v.menu()
-		return
-	}
-	v.out.WriteString(CR)
-	v.out.WriteString(eraseLine)
-	for i := 0; v.pos < len(v.data) && i < n; i++ {
-		v.out.WriteString(v.data[v.pos].view())
+		v.out.WriteString(fmt.Sprintf(sgrColor, 100))
+		v.out.WriteString(strings.Repeat(" ", v.window.width))
+		v.out.WriteString(CR)
+		v.out.WriteString(p.view())
+		v.out.WriteString(sgrReset)
 		v.out.WriteString(LF)
-		v.pos++
 	}
-	v.menu()
 }
 
 func getCmd(evt terminal.Key) command {
-
 	if evt.Control.CtrlKey() {
 		switch evt.Key {
 		case terminal.VK_HOME:
@@ -195,7 +212,6 @@ func getCmd(evt terminal.Key) command {
 	case terminal.VK_Q:
 		return cmd_Quit
 	}
-
 	return 0
 }
 
@@ -208,14 +224,17 @@ const (
 	CR  = "\x0D" //	Carriage Return	Moves the cursor to column zero.
 	ESC = "\x1B" // Escape	Starts all the escape sequences
 
-	CSI        = ESC + "["
-	eraseLine  = CSI + "2K"
-	scrollUP   = CSI + "S"
-	scrollDN   = CSI + "T"
-	fScrollUP  = CSI + "%dS"
-	fScrollDN  = CSI + "%dT"
-	fCUP       = CSI + "%dH"
-	fCUPos     = CSI + "%d;%dH"
-	sgrReverse = CSI + "7m"
-	sgrReset   = CSI + "0m"
+	CSI          = ESC + "["
+	eraseLine    = CSI + "2K"
+	eraseDisplay = CSI + "2J"
+	scrollUP     = CSI + "S"
+	scrollDN     = CSI + "T"
+	fScrollUP    = CSI + "%dS"
+	fScrollDN    = CSI + "%dT"
+	fCUP         = CSI + "%dH"
+	fCUPos       = CSI + "%d;%dH"
+	sgrReverse   = CSI + "7m"
+	sgrReset     = CSI + "0m"
+	sgrColor     = CSI + "%dm"
+	sgrFaint     = CSI + "2m"
 )

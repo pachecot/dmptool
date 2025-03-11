@@ -16,6 +16,7 @@ type node struct {
 	object   *dmp.Object
 	children []*node
 	parent   *node
+	depth    int
 }
 
 func (n *node) Name() string {
@@ -251,13 +252,14 @@ func buildGraph(h *treeHandler) *node {
 
 func (n *node) view() string {
 	if io := n.object; io != nil && len(io.Alias) > 0 && io.Alias != n.name {
-		return n.prefix + io.Alias + " [" + n.name + "]"
+		return fmt.Sprintf("%s%s [%s]", n.prefix, io.Alias, n.name)
 	}
-	return n.prefix + n.name
+	return fmt.Sprintf("%s%s", n.prefix, n.name)
 }
 
 func (t tree) view(item *node, prefix string) string {
 	t.depth++
+	item.depth = t.depth
 	cs := item.children
 	ss := make([]string, 0, len(cs)+1)
 	item.prefix = t.indent + prefix
@@ -273,6 +275,7 @@ func (t tree) view(item *node, prefix string) string {
 		return strings.Join(ss, "\n")
 	}
 	for i, c := range cs {
+		c.parent = item
 		if i == len(cs)-1 {
 			pfx = t.lf
 		}
@@ -286,6 +289,7 @@ func (t tree) create(item *node, prefix string) []*node {
 	cs := item.children
 	items := make([]*node, 0, len(cs)+1)
 	item.prefix = t.indent + prefix
+	item.depth = t.depth
 	items = append(items, item)
 	switch prefix {
 	case t.lf:
