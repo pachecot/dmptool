@@ -83,12 +83,12 @@ func (h *treeHandler) End(tag string, name string) {
 }
 
 type Command struct {
-	FileName    string
-	OutFile     string
-	Ascii       bool
-	Depth       int
-	Parents     bool
-	Interactive bool
+	FileName string
+	OutFile  string
+	Ascii    bool
+	Depth    int
+	Parents  bool
+	View     bool
 }
 
 func prune(n *node) *node {
@@ -127,7 +127,7 @@ func (cmd *Command) Execute() {
 	if cmd.Parents {
 		root = prune(root)
 	}
-	if cmd.Interactive {
+	if cmd.View {
 		items := h.tree.create(root, "")
 		v := newView(cmd.FileName, items)
 		v.run()
