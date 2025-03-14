@@ -16,12 +16,12 @@ import (
 
 type listHandler struct {
 	dmp.EmptyHandler
-	fields  []string
-	types   []string
-	filters []string
-	names   []string
-	devices []string
-	results []*dmp.Object
+	fields    []string
+	types     []string
+	names     []string
+	devices   []string
+	results   []*dmp.Object
+	whereExps []expression
 }
 
 const (
@@ -46,29 +46,54 @@ func (h *listHandler) Object(do *dmp.Object) {
 		return
 	}
 
-	if len(h.filters) > 0 && !slices.ContainsFunc(h.filters, func(f string) bool {
-		k, op, v := parseWhere(f)
-		switch op {
-		case "like":
-			switch k {
-			case "Name":
-				return isLike(do.Name, v)
-			case "DeviceId":
-				return isLike(do.DeviceId, v)
-			default:
-				return isLike(do.Properties[k], v)
-			}
-
-		case "":
-			return strings.Contains(do.Name, f) || strings.Contains(do.Path, f)
-		default:
-			return compareWith(op, do.Properties[k], v)
-		}
+	if len(h.whereExps) > 0 && !slices.ContainsFunc(h.whereExps, func(exp expression) bool {
+		return matchObject(exp, do)
 	}) {
 		return
 	}
 
 	h.results = append(h.results, do)
+}
+
+func matchObject(exp expression, do *dmp.Object) bool {
+	switch exp := exp.(type) {
+	case token:
+		return strings.Contains(do.Name, exp.p) || strings.Contains(do.Path, exp.p)
+	case uniOp:
+		if exp.kind == k_not {
+			return !matchObject(exp.rv, do)
+		}
+		return false
+	case binOp:
+		switch exp.kind {
+		case k_and:
+			return matchObject(exp.lv, do) && matchObject(exp.rv, do)
+		case k_or:
+			return matchObject(exp.lv, do) || matchObject(exp.rv, do)
+		case k_like:
+			lv := exp.lv.(token)
+			rv := exp.rv.(token)
+			switch lv.p {
+			case "Name":
+				return isLike(do.Name, rv.p)
+			case "DeviceId":
+				return isLike(do.DeviceId, rv.p)
+			default:
+				return isLike(do.Properties[lv.p], rv.p)
+			}
+		default:
+			lv := exp.lv.(token)
+			rv := exp.rv.(token)
+			switch lv.p {
+			case "Name":
+				return compareWith(exp.kind, do.Name, rv.p)
+			default:
+				return compareWith(exp.kind, do.Properties[lv.p], rv.p)
+			}
+		}
+	default:
+		return false
+	}
 }
 
 type Command struct {
@@ -87,8 +112,11 @@ func (cmd *Command) Execute() {
 		fields:  cmd.Fields,
 		names:   cmd.Names,
 		devices: cmd.Devices,
-		filters: cmd.Filters,
 		types:   cmd.Types,
+	}
+
+	for _, f := range cmd.Filters {
+		h.whereExps = append(h.whereExps, parseWhere(f))
 	}
 
 	dmp.ParseFile(cmd.FileName, h)

@@ -47,6 +47,7 @@ func TestParseWhere(t *testing.T) {
 		value string
 	}{
 		{"Case 1", "name = John", "name", "=", "John"},
+		{"Case 1b", "name == John", "name", "=", "John"},
 		{"Case 2", "name != John", "name", "!=", "John"},
 		{"Case 3", "name > John", "name", ">", "John"},
 		{"Case 4", "name < John", "name", "<", "John"},
@@ -58,9 +59,19 @@ func TestParseWhere(t *testing.T) {
 	// Run tests
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			key, op, value := parseWhere(test.input)
-			if key != test.key || op != test.op || value != test.value {
-				t.Errorf("Expected %v %v %v, but got %v %v %v", test.key, test.op, test.value, key, op, value)
+			exp := parseWhere(test.input)
+			op, ok := exp.(binOp)
+			if !ok {
+				t.Errorf("Expected binOp.")
+			}
+			if tk, ok := op.lv.(token); !ok || tk.p != test.key {
+				t.Errorf("Expected %v , but got %v", test.key, tk.p)
+			}
+			if tk := op.kind; tk.String() != test.op {
+				t.Errorf("Expected %v , but got %s", test.op, tk)
+			}
+			if tk, ok := op.rv.(token); !ok || tk.p != test.value {
+				t.Errorf("Expected %v , but got %v", test.value, tk.p)
 			}
 		})
 	}
