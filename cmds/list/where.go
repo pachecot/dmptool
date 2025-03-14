@@ -2,10 +2,13 @@ package list
 
 import (
 	"strings"
+
+	"github.com/tpacheco/dmptool/dmp"
 )
 
 type expression interface {
 	exp()
+	match(*dmp.Object) bool
 }
 
 func (e kind) exp() {}
@@ -13,9 +16,9 @@ func (e kind) exp() {}
 type kind int
 
 const (
-	k_unknown = iota
-	// k_field
+	k_unknown kind = iota
 	k_text
+	k_pattern
 	k_paren_op
 	k_paren_cl
 	k_eq
@@ -54,6 +57,8 @@ func (k kind) String() string {
 		return "unknown"
 	case k_text:
 		return "text"
+	case k_pattern:
+		return "pattern"
 	case k_paren_op:
 		return "("
 	case k_paren_cl:
@@ -89,10 +94,41 @@ type token struct {
 	p string
 }
 
+func (t token) match(do *dmp.Object) bool {
+	return strings.Contains(do.Name, t.p) || strings.Contains(do.Path, t.p)
+}
+
 type binOp struct {
 	kind
 	lv expression
 	rv expression
+}
+
+func (op binOp) match(do *dmp.Object) bool {
+	switch op.kind {
+	case k_and:
+		return op.lv.match(do) && op.rv.match(do)
+	case k_or:
+		return op.lv.match(do) || op.rv.match(do)
+	case k_like:
+		lv := op.lv.(token)
+		rv := op.rv.(token)
+		switch strings.ToLower(lv.p) {
+		case "name":
+			return isLike(do.Name, rv.p)
+		default:
+			return isLike(do.Properties[lv.p], rv.p)
+		}
+	default:
+		lv := op.lv.(token)
+		rv := op.rv.(token)
+		switch strings.ToLower(lv.p) {
+		case "name":
+			return compareWith(op.kind, do.Name, rv.p)
+		default:
+			return compareWith(op.kind, do.Properties[lv.p], rv.p)
+		}
+	}
 }
 
 type uniOp struct {
@@ -100,8 +136,21 @@ type uniOp struct {
 	rv expression
 }
 
+func (op uniOp) match(do *dmp.Object) bool {
+	switch op.kind {
+	case k_not:
+		return !op.rv.match(do)
+	default:
+		return false
+	}
+}
+
 type errOp struct {
 	kind
+}
+
+func (op errOp) match(do *dmp.Object) bool {
+	return false
 }
 
 func isSpace(c byte) bool {
@@ -127,7 +176,7 @@ func isWord(c byte) bool {
 		return true
 	}
 	switch c {
-	case '_', '.', '%':
+	case '_', '.':
 		return true
 	default:
 		return false
@@ -163,21 +212,47 @@ func readOperator(data []byte) (int, token) {
 	return p, tk
 }
 
+func readQuote(data []byte) (int, token) {
+	q := data[0]
+	p := 1
+	for ; p < len(data) && data[p] != q; p++ {
+	}
+	s := string(data[1:p])
+	if p == len(data) {
+		return p, token{kind: k_op_error}
+	}
+	p++
+	return p, token{
+		kind: k_text,
+		p:    s,
+	}
+}
+
 func readWord(data []byte) (int, token) {
+	k := k_text
 	p := 0
-	for p < len(data) && isWord(data[p]) {
-		p++
+	for ; p < len(data); p++ {
+		if isWord(data[p]) {
+			continue
+		}
+		if data[p] == '%' {
+			k = k_pattern
+			continue
+		}
+		break
 	}
 	s := string(data[:p])
-	lc := strings.ToLower(s)
+
 	// test for key words
+	lc := strings.ToLower(s)
 	if kw, ok := km[lc]; ok {
 		return p, token{
 			kind: kw,
 		}
 	}
+
 	return p, token{
-		kind: k_text,
+		kind: k,
 		p:    s,
 	}
 }
@@ -199,6 +274,10 @@ func tokenize(s string) []token {
 			n, tk := readOperator(data[i:])
 			i += n
 			tks = append(tks, tk)
+		case '"', '\'':
+			n, tk := readQuote(data[i:])
+			i += n
+			tks = append(tks, tk)
 		default:
 			n, tk := readWord(data[i:])
 			if n == 0 {
@@ -213,46 +292,66 @@ func tokenize(s string) []token {
 }
 
 func parse(tks []token) expression {
-	if len(tks) == 1 {
-		return tks[0]
-	}
-	var i int
 	var last expression
-	for i < len(tks) {
-		switch tks[i].kind {
+	for i := 0; i < len(tks); {
+		switch k := tks[i].kind; k {
+
 		case k_text:
 			last = tks[i]
 			i++
 			continue
+
 		case k_paren_op:
 			return parse(tks[i+1:])
+
 		case k_paren_cl:
 			if last != nil {
 				return last
 			}
-		case k_like, k_eq, k_ne, k_lt, k_le, k_gt, k_ge:
+
+		case k_like:
 			if last == nil || len(tks) < i {
 				return errOp{kind: k_op_error}
 			}
+			next := tks[i+1]
+			if next.kind != k_text && next.kind != k_pattern {
+				return errOp{kind: k_op_error}
+			}
 			last = binOp{
-				kind: tks[i].kind,
+				kind: k,
 				lv:   last,
-				rv:   tks[i+1],
+				rv:   next,
 			}
 			i += 2
+
+		case k_eq, k_ne, k_lt, k_le, k_gt, k_ge:
+			if last == nil || len(tks) < i {
+				return errOp{kind: k_op_error}
+			}
+			next := tks[i+1]
+			if next.kind != k_text {
+				return errOp{kind: k_op_error}
+			}
+			last = binOp{
+				kind: k,
+				lv:   last,
+				rv:   next,
+			}
+			i += 2
+
 		case k_and, k_or:
 			return binOp{
-				kind: tks[i].kind,
+				kind: k,
 				lv:   last,
 				rv:   parse(tks[i+1:]),
 			}
+
 		case k_not:
 			return uniOp{
-				kind: tks[i].kind,
+				kind: k,
 				rv:   parse(tks[i+1:]),
 			}
-		case k_op_error:
-			return errOp{kind: k_op_error}
+
 		default:
 			return errOp{kind: k_op_error}
 		}
