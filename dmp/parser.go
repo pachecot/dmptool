@@ -59,10 +59,10 @@ type parserBase struct {
 	path string
 }
 
-func (p *parserBase) child(name string, path string) parserBase {
+func (p *parserBase) child(prev parser, name string, path string) parserBase {
 	return parserBase{
 		s:    p.s,
-		prev: p.prev,
+		prev: prev,
 		name: name,
 		path: path,
 	}
@@ -187,7 +187,7 @@ func (p *dictionaryParser) parse(tk *token) parser {
 	case tag_dictionary:
 		p.s.h.Begin(tag_dictionary, values[1])
 		return &dictionaryParser{
-			parserBase: p.child(values[1], filepath.Join(p.path, p.name)),
+			parserBase: p.child(p, values[1], filepath.Join(p.path, p.name)),
 		}
 
 	case tag_dictionary_end:
@@ -347,7 +347,7 @@ func (p *controllerParser) parse(tk *token) parser {
 			pth = np
 		}
 		return &infControllerParser{
-			parserBase: p.child(v, pth),
+			parserBase: p.child(p, v, pth),
 		}
 
 	case tag_device:
@@ -357,7 +357,7 @@ func (p *controllerParser) parse(tk *token) parser {
 			pth = np
 		}
 		return &deviceParser{
-			parserBase: p.child(v, pth),
+			parserBase: p.child(p, v, pth),
 		}
 
 	case tag_container_end:
@@ -392,7 +392,7 @@ func (p *containerParser) parse(tk *token) parser {
 			pth = np
 		}
 		return &deviceParser{
-			parserBase: p.child(v, pth),
+			parserBase: p.child(p, v, pth),
 		}
 
 	case tag_container_end:
@@ -423,7 +423,7 @@ func (p *dmpParser) parse(tk *token) parser {
 			pth = np
 		}
 		return &dictionaryParser{
-			parserBase: p.child(v, pth),
+			parserBase: p.child(p, v, pth),
 		}
 
 	case tag_infinet_ctlr:
@@ -433,7 +433,7 @@ func (p *dmpParser) parse(tk *token) parser {
 			pth = np
 		}
 		return &infControllerParser{
-			parserBase: p.child(v, pth),
+			parserBase: p.child(p, v, pth),
 		}
 
 	case tag_device:
@@ -443,7 +443,7 @@ func (p *dmpParser) parse(tk *token) parser {
 			pth = np
 		}
 		return &deviceParser{
-			parserBase: p.child(v, pth),
+			parserBase: p.child(p, v, pth),
 		}
 
 	case tag_controller_begin:
@@ -453,7 +453,7 @@ func (p *dmpParser) parse(tk *token) parser {
 			pth = np
 		}
 		return &controllerParser{
-			parserBase: p.child(v, pth),
+			parserBase: p.child(p, v, pth),
 		}
 
 	case tag_container_begin:
@@ -463,7 +463,7 @@ func (p *dmpParser) parse(tk *token) parser {
 			pth = np
 		}
 		return &containerParser{
-			parserBase: p.child(v, pth),
+			parserBase: p.child(p, v, pth),
 		}
 
 	case tag_object:
