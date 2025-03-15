@@ -14,34 +14,28 @@ type ordering struct {
 }
 
 func (o ordering) compare(a, b []string) int {
+
+	s1, s2 := a[o.col], b[o.col]
+	if s1 == s2 {
+		return 0
+	}
 	sign := 1
 	if o.desc {
 		sign = -1
 	}
-	s1, s2 := a[o.col], b[o.col]
 
 	if n1, e1 := strconv.Atoi(s1); e1 == nil {
 		if n2, e2 := strconv.Atoi(s2); e2 == nil {
-			switch {
-			case n1 == n2:
-				return 0
-			case n1 < n2:
-				return -1 * sign
-			case n1 > n2:
-				return 1 * sign
+			if n1 < n2 {
+				return -sign
 			}
-			return 0
+			return sign
 		}
 	}
-	switch {
-	case s1 == s2:
-		return 0
-	case s1 < s2:
-		return -1 * sign
-	case s1 > s2:
-		return 1 * sign
+	if s1 < s2 {
+		return -sign
 	}
-	return 0
+	return sign
 }
 
 var (
