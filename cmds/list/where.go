@@ -20,6 +20,7 @@ type kind int
 const (
 	k_unknown kind = iota
 	k_text
+	k_number
 	k_pattern
 	k_paren_op
 	k_paren_cl
@@ -59,6 +60,8 @@ func (k kind) String() string {
 		return "unknown"
 	case k_text:
 		return "text"
+	case k_number:
+		return "number"
 	case k_pattern:
 		return "pattern"
 	case k_paren_op:
@@ -96,6 +99,13 @@ type token struct {
 	p string
 }
 
+func (t token) String() string {
+	if t.p == "" {
+		return t.kind.String()
+	}
+	return fmt.Sprintf("%s(%s)", t.kind, t.p)
+}
+
 func (t token) match(do *dmp.Object) bool {
 	return strings.Contains(do.Name, t.p) || strings.Contains(do.Path, t.p)
 }
@@ -104,6 +114,10 @@ type binOp struct {
 	kind
 	lv expression
 	rv expression
+}
+
+func (op binOp) String() string {
+	return fmt.Sprintf("%s %s %s", op.lv, op.kind, op.rv)
 }
 
 func (op binOp) match(do *dmp.Object) bool {
@@ -115,18 +129,22 @@ func (op binOp) match(do *dmp.Object) bool {
 	case k_like:
 		lv := op.lv.(token)
 		rv := op.rv.(token)
-		switch strings.ToLower(lv.p) {
-		case "name":
-			return isLike(do.Name, rv.p)
-		default:
-			return isLike(do.Properties[lv.p], rv.p)
-		}
+		return isLike(do.Properties[lv.p], rv.p)
 	default:
 		lv := op.lv.(token)
 		rv := op.rv.(token)
-		switch strings.ToLower(lv.p) {
-		case "name":
-			return compareWith(op.kind, do.Name, rv.p)
+		switch rv.kind {
+		case k_number:
+			left, ok := do.Properties[lv.p]
+			if !ok {
+				return false
+			}
+			if ln, err := strconv.Atoi(left); err == nil {
+				if rn, err := strconv.Atoi(rv.p); err == nil {
+					return compareWithInt(op.kind, ln, rn)
+				}
+			}
+			return compareWith(op.kind, do.Properties[lv.p], rv.p)
 		default:
 			return compareWith(op.kind, do.Properties[lv.p], rv.p)
 		}
@@ -136,6 +154,10 @@ func (op binOp) match(do *dmp.Object) bool {
 type uniOp struct {
 	kind
 	rv expression
+}
+
+func (op uniOp) String() string {
+	return fmt.Sprintf("%s %s", op.kind, op.rv)
 }
 
 func (op uniOp) match(do *dmp.Object) bool {
@@ -235,6 +257,7 @@ func readQuote(data []byte) (int, token) {
 }
 
 func readWord(data []byte) (int, token) {
+	nc := 0
 	k := k_text
 	p := 0
 	for ; p < len(data); p++ {
@@ -242,6 +265,7 @@ func readWord(data []byte) (int, token) {
 			continue
 		}
 		if isDigit(data[p]) {
+			nc++
 			continue
 		}
 		if data[p] == '%' {
@@ -258,6 +282,11 @@ func readWord(data []byte) (int, token) {
 		return p, token{
 			kind: kw,
 		}
+	}
+
+	// if all chars are digits then set to number
+	if nc == p {
+		k = k_number
 	}
 
 	return p, token{
@@ -334,6 +363,7 @@ func parse(tks []token) (int, expression) {
 				return i, errOp{kind: k_op_error}
 			}
 			next := tks[i]
+			i++
 			if next.kind != k_text && next.kind != k_pattern {
 				return i, errOp{kind: k_op_error}
 			}
@@ -342,7 +372,6 @@ func parse(tks []token) (int, expression) {
 				lv:   last,
 				rv:   next,
 			}
-			i++
 
 		case k_eq, k_ne, k_lt, k_le, k_gt, k_ge:
 			i++
@@ -350,7 +379,8 @@ func parse(tks []token) (int, expression) {
 				return i, errOp{kind: k_op_error}
 			}
 			next := tks[i]
-			if next.kind != k_text {
+			i++
+			if next.kind != k_text && next.kind != k_number {
 				return i, errOp{kind: k_op_error}
 			}
 			last = binOp{
@@ -358,21 +388,22 @@ func parse(tks []token) (int, expression) {
 				lv:   last,
 				rv:   next,
 			}
-			i++
 
 		case k_and, k_or:
-			n, rest := parse(tks[i+1:])
 			i++
-			return i + n, binOp{
+			n, rest := parse(tks[i:])
+			i += n
+			return i, binOp{
 				kind: k,
 				lv:   last,
 				rv:   rest,
 			}
 
 		case k_not:
-			n, rest := parse(tks[i+1:])
 			i++
-			return i + n, uniOp{
+			n, rest := parse(tks[i:])
+			i += n
+			return i, uniOp{
 				kind: k,
 				rv:   rest,
 			}
@@ -391,18 +422,12 @@ func parseWhere(f string) expression {
 		fmt.Println("error parsing where at ", n)
 	}
 	if n < len(tks) {
-		fmt.Println("error parsing where incomplete ", n)
+		fmt.Println("error parsing where incomplete ", n, len(tks))
 	}
 	return e
 }
 
 func compareWith(op kind, p, v string) bool {
-
-	if pn, err := strconv.Atoi(p); err == nil {
-		if vn, err := strconv.Atoi(v); err == nil {
-			return compareWithInt(op, pn, vn)
-		}
-	}
 
 	switch op {
 	case k_eq:
