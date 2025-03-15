@@ -160,10 +160,6 @@ func buildTable(cmd *Command, h *listHandler) [][]string {
 		row := make([]string, cols)
 		table = append(table, row)
 		for i, n := range cmd.Fields {
-			if n == "Name" {
-				row[i] = obj.Name
-				continue
-			}
 			if p, ok := obj.Properties[n]; ok {
 				row[i] = p
 			}
