@@ -52,73 +52,75 @@ type state struct {
 }
 
 type dmpParser struct {
+	s       *state
+	h       Handler
+	prev    parser
 	name    string
 	path    string
 	devPath string
-	h       Handler
-	s       *state
 }
 
 func newParser(h Handler) *dmpParser {
 	return &dmpParser{
-		h: h,
 		s: &state{
 			alias: map[string]string{},
 		},
+		h: h,
 	}
 }
 
 type infControllerParser struct {
+	s    *state
+	h    Handler
 	prev parser
 	name string
 	path string
-	h    Handler
-	s    *state
 }
 
 type deviceParser struct {
+	s    *state
+	h    Handler
 	prev parser
 	name string
 	path string
-	h    Handler
-	s    *state
 }
 
 type controllerParser struct {
-	last parser
+	s    *state
+	h    Handler
+	prev parser
 	name string
 	path string
-	h    Handler
-	s    *state
 }
 
 type containerParser struct {
-	last parser
+	s    *state
+	h    Handler
+	prev parser
 	name string
 	path string
-	h    Handler
-	s    *state
 }
 
 type dictionaryParser struct {
+	s      *state
+	h      Handler
 	prev   parser
 	name   string
 	path   string
 	tables []*Table
-	h      Handler
-	s      *state
 }
 
 type tableParser struct {
+	s     *state
 	prev  *dictionaryParser
 	table *Table
-	s     *state
 }
 
 type objectParser struct {
+	s        *state
+	h        Handler
 	prev     parser
 	lastProp string
-	h        Handler
 	obj      *Object
 }
 
@@ -140,18 +142,18 @@ func newObjectParser(h Handler, p parser, s *state, name string, pth string) *ob
 }
 
 type codeParser struct {
+	s     *state
 	prev  *objectParser
 	lines []string
-	s     *state
 }
 
 type blockParser struct {
+	s          *state
 	prev       *objectParser
 	name       string
 	endTag     string
 	includeEnd bool
 	lines      []string
-	s          *state
 }
 
 func (p *blockParser) parse(tk *token) parser {
@@ -185,12 +187,14 @@ func (p *dictionaryParser) parse(tk *token) parser {
 	for i := range values {
 		values[i] = strings.TrimSpace(values[i])
 	}
+
 	switch values[0] {
+
 	case tag_dictionary:
 		p.h.Begin(tag_dictionary, values[1])
 		return &dictionaryParser{
-			prev: p,
 			h:    p.h,
+			prev: p,
 			name: values[1],
 			path: filepath.Join(p.path, p.name),
 			s:    p.s,
@@ -239,13 +243,14 @@ func (p *tableParser) parse(tk *token) parser {
 	}
 
 	switch cells[0] {
-	case
-		tag_dictionary,
-		tag_dictionary_end:
+
+	case tag_dictionary, tag_dictionary_end:
+
 		// previous length checks should catch this and
 		// should never get here
 		p.prev.tables = append(p.prev.tables, p.table)
 		return p.prev.parse(tk)
+
 	}
 
 	p.table.Rows = append(p.table.Rows, cells)
@@ -324,6 +329,7 @@ func (p *objectParser) parse(tk *token) parser {
 
 	default:
 		p.obj.Properties[k] = v
+
 	}
 
 	p.lastProp = k
@@ -333,7 +339,9 @@ func (p *objectParser) parse(tk *token) parser {
 
 func (p *controllerParser) parse(tk *token) parser {
 	k, v, _ := split(tk.value)
+
 	switch k {
+
 	case tag_object:
 		p.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
@@ -355,6 +363,7 @@ func (p *controllerParser) parse(tk *token) parser {
 			h:    p.h,
 			s:    p.s,
 		}
+
 	case tag_device:
 		p.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
@@ -368,19 +377,24 @@ func (p *controllerParser) parse(tk *token) parser {
 			h:    p.h,
 			s:    p.s,
 		}
+
 	case tag_container_end:
 		p.h.End(tag_container, p.name)
-		return p.last
+		return p.prev
+
 	case tag_controller_end:
 		p.h.End(tag_controller, p.name)
-		return p.last
+		return p.prev
+
 	}
 	return p
 }
 
 func (p *containerParser) parse(tk *token) parser {
 	k, v, _ := split(tk.value)
+
 	switch k {
+
 	case tag_object:
 		p.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
@@ -405,7 +419,7 @@ func (p *containerParser) parse(tk *token) parser {
 
 	case tag_container_end:
 		p.h.End(tag_container, p.name)
-		return p.last
+		return p.prev
 
 	}
 	return p
@@ -413,6 +427,7 @@ func (p *containerParser) parse(tk *token) parser {
 
 func (p *dmpParser) parse(tk *token) parser {
 	k, v, _ := split(tk.value)
+
 	switch k {
 
 	case prop_path:
@@ -472,7 +487,7 @@ func (p *dmpParser) parse(tk *token) parser {
 			pth = np
 		}
 		return &controllerParser{
-			last: p,
+			prev: p,
 			name: v,
 			path: pth,
 			h:    p.h,
@@ -486,7 +501,7 @@ func (p *dmpParser) parse(tk *token) parser {
 			pth = np
 		}
 		return &containerParser{
-			last: p,
+			prev: p,
 			name: v,
 			path: pth,
 			h:    p.h,
@@ -507,7 +522,9 @@ func (p *dmpParser) parse(tk *token) parser {
 
 func (p *infControllerParser) parse(tk *token) parser {
 	k, v, _ := split(tk.value)
+
 	switch k {
+
 	case tag_object:
 		p.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
@@ -519,13 +536,16 @@ func (p *infControllerParser) parse(tk *token) parser {
 	case tag_infinet_ctlr_end:
 		p.h.End(tag_infinet_ctlr, p.name)
 		return p.prev
+
 	}
 	return p
 }
 
 func (p *deviceParser) parse(tk *token) parser {
 	k, v, _ := split(tk.value)
+
 	switch k {
+
 	case tag_object:
 		p.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
@@ -537,6 +557,7 @@ func (p *deviceParser) parse(tk *token) parser {
 	case tag_device_end:
 		p.h.End(tag_device, p.name)
 		return p.prev
+
 	}
 	return p
 }
