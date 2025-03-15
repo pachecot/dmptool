@@ -120,7 +120,23 @@ type objectParser struct {
 	lastProp string
 	h        Handler
 	obj      *Object
-	s        *state
+}
+
+func newObject(name string, pth string) *Object {
+	return &Object{
+		Name:       name,
+		Path:       pth,
+		Properties: map[string]string{"Name": name},
+	}
+}
+
+func newObjectParser(h Handler, p parser, s *state, name string, pth string) *objectParser {
+	return &objectParser{
+		h:    h,
+		prev: p,
+		obj:  newObject(name, pth),
+		s:    s,
+	}
 }
 
 type codeParser struct {
@@ -324,15 +340,8 @@ func (p *controllerParser) parse(tk *token) parser {
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
-		return &objectParser{
-			prev: p,
-			h:    p.h,
-			obj: &Object{
-				Name: v,
-				Path: pth,
-			},
-			s: p.s,
-		}
+		return newObjectParser(p.h, p, p.s, v, pth)
+
 	case tag_infinet_ctlr:
 		p.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
@@ -378,15 +387,7 @@ func (p *containerParser) parse(tk *token) parser {
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
-		return &objectParser{
-			prev: p,
-			h:    p.h,
-			obj: &Object{
-				Name: v,
-				Path: pth,
-			},
-			s: p.s,
-		}
+		return newObjectParser(p.h, p, p.s, v, pth)
 
 	case tag_device:
 		p.h.Begin(k, v)
@@ -498,15 +499,8 @@ func (p *dmpParser) parse(tk *token) parser {
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
-		return &objectParser{
-			prev: p,
-			h:    p.h,
-			obj: &Object{
-				Name: v,
-				Path: pth,
-			},
-			s: p.s,
-		}
+		return newObjectParser(p.h, p, p.s, v, pth)
+
 	}
 	return p
 }
@@ -520,15 +514,8 @@ func (p *infControllerParser) parse(tk *token) parser {
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
-		return &objectParser{
-			prev: p,
-			h:    p.h,
-			obj: &Object{
-				Name: v,
-				Path: pth,
-			},
-			s: p.s,
-		}
+		return newObjectParser(p.h, p, p.s, v, pth)
+
 	case tag_infinet_ctlr_end:
 		p.h.End(tag_infinet_ctlr, p.name)
 		return p.prev
@@ -545,15 +532,7 @@ func (p *deviceParser) parse(tk *token) parser {
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
-		return &objectParser{
-			prev: p,
-			h:    p.h,
-			obj: &Object{
-				Name: v,
-				Path: pth,
-			},
-			s: p.s,
-		}
+		return newObjectParser(p.h, p, p.s, v, pth)
 
 	case tag_device_end:
 		p.h.End(tag_device, p.name)
