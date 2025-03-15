@@ -112,6 +112,10 @@ is used to match a substring of the Name or Path properties. The where filter ca
 where filter can be used to filter the objects based on the properties of the object. The operators that can be used are "=", ">", "<", ">=", "<=", and "like".
 The "like" operator is used to match a substring of the property value. If no operator is used the parameter will try to match the substring of the Name and Path
  properties.
+
+The result table can be sorted with the --sort flag. the fields must be in the fields flag. the ordering
+is ascending by default, descending specific order can be specified with ASC or DESC before the fields. 
+
 `,
 		Aliases: []string{},
 		Args:    cobra.MinimumNArgs(1),
@@ -122,6 +126,7 @@ The "like" operator is used to match a substring of the property value. If no op
 	}
 
 	cc.Flags().StringVarP(&listCmd.OutFile, "output", "o", "", "output file to write to")
+	cc.Flags().StringSliceVarP(&listCmd.Ordering, "sort", "s", []string{}, "sort ordering of fields")
 	cc.Flags().StringSliceVarP(&listCmd.Filters, "where", "w", []string{}, "where like filter")
 	cc.Flags().StringSliceVarP(&listCmd.Names, "names", "n", []string{}, "filter with matching names")
 	cc.Flags().StringSliceVarP(&listCmd.Devices, "devices", "d", []string{}, "filter with matching device ids / paths")

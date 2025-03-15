@@ -30,6 +30,7 @@ const (
 )
 
 func (h *listHandler) Object(do *dmp.Object) {
+
 	if len(h.types) > 0 && !slices.Contains(h.types, do.Type) {
 		return
 	}
@@ -63,6 +64,7 @@ type Command struct {
 	Filters  []string
 	Names    []string
 	Devices  []string
+	Ordering []string
 }
 
 func (cmd *Command) Execute() {
@@ -80,6 +82,9 @@ func (cmd *Command) Execute() {
 
 	dmp.ParseFile(cmd.FileName, h)
 
+	// if no fields are given then display the fields
+	// or if first field is *, -, or ? then display the
+	// fields
 	switch len(cmd.Fields) {
 	case 0:
 		processFields(h)
@@ -93,6 +98,14 @@ func (cmd *Command) Execute() {
 	}
 
 	table := buildTable(cmd, h)
+
+	if len(cmd.Ordering) > 0 {
+		err := reorder(cmd.Ordering, cmd.Fields, table)
+		if err != nil {
+			fmt.Printf("could not reorder results: %s", err)
+			return
+		}
+	}
 
 	switch strings.ToLower(path.Ext(cmd.OutFile)) {
 	case xlsxExt:
