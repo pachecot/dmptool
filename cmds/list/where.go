@@ -1,6 +1,8 @@
 package list
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/tpacheco/dmptool/dmp"
@@ -183,6 +185,10 @@ func isWord(c byte) bool {
 	}
 }
 
+func isDigit(c byte) bool {
+	return '0' <= c && c <= '9'
+}
+
 func skipSpace(data []byte) int {
 	p := 0
 	for p < len(data) && isSpace(data[p]) {
@@ -233,6 +239,9 @@ func readWord(data []byte) (int, token) {
 	p := 0
 	for ; p < len(data); p++ {
 		if isWord(data[p]) {
+			continue
+		}
+		if isDigit(data[p]) {
 			continue
 		}
 		if data[p] == '%' {
@@ -291,8 +300,9 @@ func tokenize(s string) []token {
 	return tks
 }
 
-func parse(tks []token) expression {
+func parse(tks []token) (int, expression) {
 	var last expression
+	inParen := false
 	for i := 0; i < len(tks); {
 		switch k := tks[i].kind; k {
 
@@ -302,70 +312,116 @@ func parse(tks []token) expression {
 			continue
 
 		case k_paren_op:
-			return parse(tks[i+1:])
+			inParen = true
+			var n int
+			i++
+			n, last = parse(tks[i:])
+			i += n
 
 		case k_paren_cl:
-			if last != nil {
-				return last
+			i++
+			if !inParen {
+				return i, last
 			}
+			if last == nil {
+				return i, errOp{kind: k_op_error}
+			}
+			inParen = false
 
 		case k_like:
-			if last == nil || len(tks) < i {
-				return errOp{kind: k_op_error}
+			i++
+			if last == nil || i >= len(tks) {
+				return i, errOp{kind: k_op_error}
 			}
-			next := tks[i+1]
+			next := tks[i]
 			if next.kind != k_text && next.kind != k_pattern {
-				return errOp{kind: k_op_error}
+				return i, errOp{kind: k_op_error}
 			}
 			last = binOp{
 				kind: k,
 				lv:   last,
 				rv:   next,
 			}
-			i += 2
+			i++
 
 		case k_eq, k_ne, k_lt, k_le, k_gt, k_ge:
-			if last == nil || len(tks) < i {
-				return errOp{kind: k_op_error}
+			i++
+			if last == nil || i >= len(tks) {
+				return i, errOp{kind: k_op_error}
 			}
-			next := tks[i+1]
+			next := tks[i]
 			if next.kind != k_text {
-				return errOp{kind: k_op_error}
+				return i, errOp{kind: k_op_error}
 			}
 			last = binOp{
 				kind: k,
 				lv:   last,
 				rv:   next,
 			}
-			i += 2
+			i++
 
 		case k_and, k_or:
-			return binOp{
+			n, rest := parse(tks[i+1:])
+			i++
+			return i + n, binOp{
 				kind: k,
 				lv:   last,
-				rv:   parse(tks[i+1:]),
+				rv:   rest,
 			}
 
 		case k_not:
-			return uniOp{
+			n, rest := parse(tks[i+1:])
+			i++
+			return i + n, uniOp{
 				kind: k,
-				rv:   parse(tks[i+1:]),
+				rv:   rest,
 			}
 
 		default:
-			return errOp{kind: k_op_error}
+			return i, errOp{kind: k_op_error}
 		}
 	}
-	return last
+	return len(tks), last
 }
 
 func parseWhere(f string) expression {
 	tks := tokenize(f)
-	return parse(tks)
+	n, e := parse(tks)
+	if _, ok := e.(errOp); ok {
+		fmt.Println("error parsing where at ", n)
+	}
+	if n < len(tks) {
+		fmt.Println("error parsing where incomplete ", n)
+	}
+	return e
 }
 
-func compareWith(op kind, p string, v string) bool {
-	// fmt.Printf("%s %s %s\n", p, op, v)
+func compareWith(op kind, p, v string) bool {
+
+	if pn, err := strconv.Atoi(p); err == nil {
+		if vn, err := strconv.Atoi(v); err == nil {
+			return compareWithInt(op, pn, vn)
+		}
+	}
+
+	switch op {
+	case k_eq:
+		return p == v
+	case k_ne:
+		return p != v
+	case k_gt:
+		return p > v
+	case k_lt:
+		return p < v
+	case k_ge:
+		return p >= v
+	case k_le:
+		return p <= v
+	}
+	return false
+}
+
+func compareWithInt(op kind, p, v int) bool {
 	switch op {
 	case k_eq:
 		return p == v
