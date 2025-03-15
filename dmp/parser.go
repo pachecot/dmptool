@@ -552,14 +552,7 @@ func ParseFile(file string, h Handler) string {
 	}
 	defer r.Close()
 
-	p := newParser(h)
-
-	err = scanWith(r, p)
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-
-	return p.devPath
+	return Parse(r, h)
 }
 
 // ParseFile if the main function to start parsing the file
