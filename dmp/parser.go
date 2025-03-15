@@ -48,65 +48,60 @@ type parser interface {
 }
 
 type state struct {
+	h     Handler
 	alias map[string]string
 }
 
+type parserBase struct {
+	s    *state
+	prev parser
+	name string
+	path string
+}
+
+func (p *parserBase) child(name string, path string) parserBase {
+	return parserBase{
+		s:    p.s,
+		prev: p.prev,
+		name: name,
+		path: path,
+	}
+}
+
 type dmpParser struct {
-	s       *state
-	h       Handler
-	prev    parser
-	name    string
-	path    string
+	parserBase
 	devPath string
 }
 
 func newParser(h Handler) *dmpParser {
 	return &dmpParser{
-		s: &state{
-			alias: map[string]string{},
+		parserBase: parserBase{
+			s: &state{
+				h:     h,
+				alias: map[string]string{},
+			},
 		},
-		h: h,
 	}
 }
 
 type infControllerParser struct {
-	s    *state
-	h    Handler
-	prev parser
-	name string
-	path string
+	parserBase
 }
 
 type deviceParser struct {
-	s    *state
-	h    Handler
-	prev parser
-	name string
-	path string
+	parserBase
 }
 
 type controllerParser struct {
-	s    *state
-	h    Handler
-	prev parser
-	name string
-	path string
+	parserBase
 }
 
 type containerParser struct {
-	s    *state
-	h    Handler
-	prev parser
-	name string
-	path string
+	parserBase
 }
 
 type dictionaryParser struct {
-	s      *state
-	h      Handler
-	prev   parser
-	name   string
-	path   string
+	parserBase
 	tables []*Table
 }
 
@@ -117,9 +112,7 @@ type tableParser struct {
 }
 
 type objectParser struct {
-	s        *state
-	h        Handler
-	prev     parser
+	parserBase
 	lastProp string
 	obj      *Object
 }
@@ -132,12 +125,13 @@ func newObject(name string, pth string) *Object {
 	}
 }
 
-func newObjectParser(h Handler, p parser, s *state, name string, pth string) *objectParser {
+func newObjectParser(p parser, s *state, name string, pth string) *objectParser {
 	return &objectParser{
-		h:    h,
-		prev: p,
-		obj:  newObject(name, pth),
-		s:    s,
+		parserBase: parserBase{
+			s:    s,
+			prev: p,
+		},
+		obj: newObject(name, pth),
 	}
 }
 
@@ -191,22 +185,18 @@ func (p *dictionaryParser) parse(tk *token) parser {
 	switch values[0] {
 
 	case tag_dictionary:
-		p.h.Begin(tag_dictionary, values[1])
+		p.s.h.Begin(tag_dictionary, values[1])
 		return &dictionaryParser{
-			h:    p.h,
-			prev: p,
-			name: values[1],
-			path: filepath.Join(p.path, p.name),
-			s:    p.s,
+			parserBase: p.child(values[1], filepath.Join(p.path, p.name)),
 		}
 
 	case tag_dictionary_end:
-		p.h.Dictionary(&Dictionary{
+		p.s.h.Dictionary(&Dictionary{
 			Path:   p.path,
 			Name:   p.name,
 			Tables: p.tables,
 		})
-		p.h.End(tag_dictionary, p.name)
+		p.s.h.End(tag_dictionary, p.name)
 		return p.prev
 
 	case "'TYPE":
@@ -267,8 +257,8 @@ func (p *objectParser) parse(tk *token) parser {
 	switch k {
 
 	case tag_object_end:
-		p.h.Object(p.obj)
-		p.h.End(tag_object, p.obj.Name)
+		p.s.h.Object(p.obj)
+		p.s.h.End(tag_object, p.obj.Name)
 		return p.prev
 
 	case prop_last_change:
@@ -343,47 +333,39 @@ func (p *controllerParser) parse(tk *token) parser {
 	switch k {
 
 	case tag_object:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
-		return newObjectParser(p.h, p, p.s, v, pth)
+		return newObjectParser(p, p.s, v, pth)
 
 	case tag_infinet_ctlr:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
 		return &infControllerParser{
-			prev: p,
-			name: v,
-			path: pth,
-			h:    p.h,
-			s:    p.s,
+			parserBase: p.child(v, pth),
 		}
 
 	case tag_device:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
 		return &deviceParser{
-			prev: p,
-			name: v,
-			path: pth,
-			h:    p.h,
-			s:    p.s,
+			parserBase: p.child(v, pth),
 		}
 
 	case tag_container_end:
-		p.h.End(tag_container, p.name)
+		p.s.h.End(tag_container, p.name)
 		return p.prev
 
 	case tag_controller_end:
-		p.h.End(tag_controller, p.name)
+		p.s.h.End(tag_controller, p.name)
 		return p.prev
 
 	}
@@ -396,29 +378,25 @@ func (p *containerParser) parse(tk *token) parser {
 	switch k {
 
 	case tag_object:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
-		return newObjectParser(p.h, p, p.s, v, pth)
+		return newObjectParser(p, p.s, v, pth)
 
 	case tag_device:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
 		return &deviceParser{
-			prev: p,
-			name: v,
-			path: pth,
-			h:    p.h,
-			s:    p.s,
+			parserBase: p.child(v, pth),
 		}
 
 	case tag_container_end:
-		p.h.End(tag_container, p.name)
+		p.s.h.End(tag_container, p.name)
 		return p.prev
 
 	}
@@ -435,86 +413,66 @@ func (p *dmpParser) parse(tk *token) parser {
 			p.path = v
 			p.name = v
 		}
-		p.h.Path(v)
+		p.s.h.Path(v)
 
 	case tag_dictionary:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		p.devPath = filepath.Join(p.path, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
 		return &dictionaryParser{
-			prev: p,
-			h:    p.h,
-			name: v,
-			path: pth,
-			s:    p.s,
+			parserBase: p.child(v, pth),
 		}
 
 	case tag_infinet_ctlr:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
 		return &infControllerParser{
-			prev: p,
-			name: v,
-			path: pth,
-			h:    p.h,
-			s:    p.s,
+			parserBase: p.child(v, pth),
 		}
 
 	case tag_device:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
 		return &deviceParser{
-			prev: p,
-			name: v,
-			path: pth,
-			h:    p.h,
-			s:    p.s,
+			parserBase: p.child(v, pth),
 		}
 
 	case tag_controller_begin:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
 		return &controllerParser{
-			prev: p,
-			name: v,
-			path: pth,
-			h:    p.h,
-			s:    p.s,
+			parserBase: p.child(v, pth),
 		}
 
 	case tag_container_begin:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
 		return &containerParser{
-			prev: p,
-			name: v,
-			path: pth,
-			h:    p.h,
-			s:    p.s,
+			parserBase: p.child(v, pth),
 		}
 
 	case tag_object:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
-		return newObjectParser(p.h, p, p.s, v, pth)
+		return newObjectParser(p, p.s, v, pth)
 
 	}
 	return p
@@ -526,15 +484,15 @@ func (p *infControllerParser) parse(tk *token) parser {
 	switch k {
 
 	case tag_object:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
-		return newObjectParser(p.h, p, p.s, v, pth)
+		return newObjectParser(p, p.s, v, pth)
 
 	case tag_infinet_ctlr_end:
-		p.h.End(tag_infinet_ctlr, p.name)
+		p.s.h.End(tag_infinet_ctlr, p.name)
 		return p.prev
 
 	}
@@ -547,15 +505,15 @@ func (p *deviceParser) parse(tk *token) parser {
 	switch k {
 
 	case tag_object:
-		p.h.Begin(k, v)
+		p.s.h.Begin(k, v)
 		pth := filepath.Join(p.path, v)
 		if np, ok := p.s.alias[pth]; ok {
 			pth = np
 		}
-		return newObjectParser(p.h, p, p.s, v, pth)
+		return newObjectParser(p, p.s, v, pth)
 
 	case tag_device_end:
-		p.h.End(tag_device, p.name)
+		p.s.h.End(tag_device, p.name)
 		return p.prev
 
 	}
