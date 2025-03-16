@@ -79,43 +79,48 @@ func newCmdList() *cobra.Command {
 	cc := &cobra.Command{
 		Use:   "list <dump file>",
 		Short: "extracts list of objects into list",
-		Long: `This command will extract the list of objects from the dump file. The list can be filtered by the type of object,
-the name of the object, the device id or path, and the properties of the object. The output can be written to a file in csv or xlsx format.	
+		Long: `This command will extract the list of objects from the dump file. The list can 
+be filtered by the type of object, the name of the object, the device id or 
+path, and the properties of the object. The output can be written to a file in 
+text, csv or xlsx formats.	
 
-The output file can be specified with the --output flag. If the file extension is .csv, then the output will be in csv format.
-If the file extension is .xlsx, then the output will be in xlsx format. If the file extension is not recognized, then the output
-will be written as a text. If the output is not specified then the output is to stout.
+The output file can be specified with the --output flag. If the file extension 
+is .csv, then the output will be in csv format. If the file extension is .xlsx,
+then the output will be in xlsx format. If the file extension is not recognized,
+then the output will be written as a plain text. If the output is not specified
+then the output is to the console.
 
-The fields to include in the output can be specified with the --fields flag. The default fields are DeviceId, Name, and Type. The fields
-can be any of the properties of the object. The fields can be specified multiple times to include multiple fields. The fields can also be
-specified with the --fields flag in the format of "field1,field2,field3".
+The fields to include in the output can be specified with the --fields flag. 
+The default fields are DeviceId, Name, and Type. The fields can be any of the 
+properties of the object. The flag can be specified multiple times. The flag 
+can also be specified in the format of "field1,field2,field3".
 
-The types of objects to include in the output can be specified with the --types flag. The types can be specified multiple times to include
-multiple types. The types can also be specified with the --types flag in the format of "type1,type2,type3".
+The types of objects to include in the output can be specified with the --types
+flag. The flag can be specified multiple times. The flag can also be specified 
+in the format of "type1,type2,type3".
 
-The names of the objects to include in the output can be specified with the --names flag. The names can be specified multiple times to include
-multiple names. The names can also be specified with the --names flag in the format of "name1,name2,name3". The names are matched with the Name
-property of the object.
+The names of the objects to include in the output can be specified with the 
+--names flag. The flag be specified multiple times. The flag can also be 
+specified in the format of "name1,name2,name3". The names are matched with the 
+Name property of the object.
 
-The device ids or paths of the objects to include in the output can be specified with the --devices flag. The device ids or paths can be specified
-multiple times to include multiple device ids or paths. The device ids or paths can also be specified with the --devices flag in the format of
-"device1,device2,device3". The device ids or paths are matched with the Path property of the object. The device ids or paths can be partial matches.
+The device ids or paths of the objects to include in the output can be specified
+with the --devices flag. The flag can be specified multiple times to include 
+multiple device ids or paths. The flag can also be specified in the format of 
+"device1,device2,device3". The device ids or paths are matched with the Path 
+property of the object. The device ids or paths can be partial matches.
 
-The properties of the objects to include in the output can be specified with the --where flag. The where filter can be specified multiple times to
-include multiple filters. The where filter can also be specified with the --where flag in the format of "field1 op1 value1,field2 op2 value2,field3 op3 value3".
-The where filter can be used to filter the objects based on the properties of the object. The where filter can be used to filter the objects based on
-the properties of the object. The operators that can be used are "=", ">", "<", ">=", "<=", "like", and "@". The "like" operator is used to match a
-substring of the property value. The "@" operator is used to match a substring of the Name or Path properties. The where filter can be used to filter
-the objects based on the properties of the object. The where filter can be used to filter the objects based on the properties of the object. The operators
-that can be used are "=", ">", "<", ">=", "<=", "like", and "@". The "like" operator is used to match a substring of the property value. The "@" operator
-is used to match a substring of the Name or Path properties. The where filter can be used to filter the objects based on the properties of the object. The
-where filter can be used to filter the objects based on the properties of the object. The operators that can be used are "=", ">", "<", ">=", "<=", and "like".
-The "like" operator is used to match a substring of the property value. If no operator is used the parameter will try to match the substring of the Name and Path
- properties.
+The properties of the objects to include in the output can be specified with 
+the --where flag. The where filter can be used to filter the objects based on 
+the properties of the object. The operators that can be used are "=", ">", "<",
+">=", "<=", "like", and "in". The "like" operator is used to match a substring 
+of the property value using patterns and the '%' as a wildcard. If no operator 
+is used the parameter will try to match the substring of the Name and Path 
+properties.
 
-The result table can be sorted with the --sort flag. the fields must be in the fields flag. the ordering
-is ascending by default, descending specific order can be specified with ASC or DESC before the fields. 
-
+The result table can be sorted with the --sort flag. the fields must be in the
+fields flag. the ordering is ascending by default, descending specific order can
+be specified with ASC or DESC before the fields. 
 `,
 		Aliases: []string{},
 		Args:    cobra.MinimumNArgs(1),
