@@ -32,14 +32,40 @@ func (o ordering) compare(a, b []string) int {
 			return sign
 		}
 	}
-	if s1 < s2 {
-		return -sign
+
+	xs1 := partitionDigits(s1)
+	xs2 := partitionDigits(s2)
+
+	for i := range xs1 {
+		if i >= len(xs2) {
+			return -sign
+		}
+		if xs1[i] == xs2[i] {
+			continue
+		}
+		if isDigit(xs1[i][0]) && isDigit(xs2[i][0]) {
+			n1, _ := strconv.Atoi(xs1[i])
+			n2, _ := strconv.Atoi(xs2[i])
+			if n1 < n2 {
+				return -sign
+			}
+			return sign
+		}
+		if xs1[i] < xs2[i] {
+			return -sign
+		}
+		return sign
 	}
-	return sign
+	if len(xs2) > len(xs1) {
+		return sign
+	}
+	return 0
 }
 
 var (
-	errBadOrder = errors.New("bad order")
+	errOrderbyParseFailed       = errors.New("orderby failed parse")
+	errOrderbyUnrecognizedOrder = errors.New("orderby direction unknown")
+	errOrderbyUnknownField      = errors.New("orderby unknown field")
 )
 
 func reorder(orders []string, fields []string, table [][]string) error {
@@ -64,14 +90,14 @@ func reorder(orders []string, fields []string, table [][]string) error {
 			case "desc":
 				os[i].desc = true
 			default:
-				return errBadOrder
+				return errOrderbyUnrecognizedOrder
 			}
 		default:
-			return errBadOrder
+			return errOrderbyParseFailed
 		}
 		os[i].col = slices.Index(lc_fields, os[i].name)
 		if os[i].col < 0 {
-			return errBadOrder
+			return errOrderbyUnknownField
 		}
 	}
 	slices.SortFunc(table, func(a, b []string) int {
@@ -84,4 +110,27 @@ func reorder(orders []string, fields []string, table [][]string) error {
 		return 0
 	})
 	return nil
+}
+
+func partitionDigits(s string) []string {
+	r := make([]string, 0)
+	inDigit := false
+	left := 0
+	for i := range s {
+		if isDigit(s[i]) {
+			if !inDigit && i > 0 {
+				r = append(r, s[left:i])
+				left = i
+				inDigit = true
+			}
+		} else {
+			if inDigit {
+				r = append(r, s[left:i])
+				left = i
+				inDigit = false
+			}
+		}
+	}
+	r = append(r, s[left:])
+	return r
 }
