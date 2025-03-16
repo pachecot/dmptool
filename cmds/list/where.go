@@ -40,6 +40,7 @@ const (
 	k_and
 	k_or
 	k_in
+	k_is
 	k_null
 	k_where
 	k_between
@@ -55,6 +56,7 @@ var (
 		"=":  k_eq,
 		"==": k_eq,
 		"!=": k_ne,
+		"<>": k_ne,
 		"<":  k_lt,
 		">":  k_gt,
 		"<=": k_le,
@@ -74,6 +76,7 @@ var (
 		"null":    k_null,
 		"order":   k_order,
 		"by":      k_by,
+		"is":      k_by,
 	}
 )
 
@@ -122,6 +125,8 @@ func (k kind) String() string {
 		return "null"
 	case k_in:
 		return "in"
+	case k_is:
+		return "is"
 	case k_select:
 		return "select"
 	case k_where:
@@ -152,6 +157,7 @@ func (t token) match(do *dmp.Object) bool {
 	return strings.Contains(do.Name, t.text) || strings.Contains(do.Path, t.text)
 }
 
+// binOp represents a binary operation
 type binOp struct {
 	kind
 	lv expression
@@ -196,6 +202,7 @@ func (op binOp) match(do *dmp.Object) bool {
 	}
 }
 
+// uniOp represents a unary operations
 type uniOp struct {
 	kind
 	rv expression
