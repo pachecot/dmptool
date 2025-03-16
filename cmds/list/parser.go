@@ -38,6 +38,11 @@ func parse(tks []token) (int, expression) {
 		case k_comma:
 			return i, last
 
+		case k_integer, k_decimal:
+			last = tks[i]
+			i++
+			continue
+
 		case k_text:
 			last = tks[i]
 			i++
@@ -72,6 +77,43 @@ func parse(tks []token) (int, expression) {
 				items: items,
 			}
 
+		case k_between:
+			i++
+			if last == nil || i >= len(tks) {
+				return i, errOp{offset: pos}
+			}
+			if len(tks)-i < 3 {
+				return i, errOp{offset: pos}
+			}
+
+			if tks[i+1].kind == k_and &&
+				tks[i+0].kind.match(k_text, k_integer, k_decimal) &&
+				tks[i+2].kind.match(k_text, k_integer, k_decimal) {
+				last = betweenOp{
+					kind:  k_between,
+					test:  last,
+					begin: tks[i+0],
+					end:   tks[i+2],
+				}
+				i += 3
+				continue
+			}
+
+			n, ex := parse(tks[i:])
+			i += n
+
+			op, ok := ex.(binOp)
+			if !ok || op.kind != k_and {
+				return i, errOp{offset: pos}
+			}
+
+			last = betweenOp{
+				kind:  k_between,
+				test:  last,
+				begin: op.lv,
+				end:   op.rv,
+			}
+
 		case k_like:
 			i++
 			if last == nil || i >= len(tks) {
@@ -101,7 +143,7 @@ func parse(tks []token) (int, expression) {
 			i++
 			switch next.kind {
 
-			case k_text, k_number, k_null:
+			case k_text, k_integer, k_decimal, k_null:
 				last = binOp{
 					kind: k,
 					lv:   last,

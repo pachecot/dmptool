@@ -92,7 +92,13 @@ func (op binOp) match(do *dmp.Object) bool {
 
 		switch rv.kind {
 
-		case k_number:
+		case k_decimal:
+			if rn, err := strconv.ParseFloat(rv.text, 32); err == nil {
+				return compareWithFloat(do.Properties, lv.text, op.kind, rn)
+			}
+			return compareWith(do.Properties, lv.text, op.kind, rv.text)
+
+		case k_integer:
 			if rn, err := strconv.Atoi(rv.text); err == nil {
 				return compareWithInt(do.Properties, lv.text, op.kind, rn)
 			}
@@ -196,6 +202,47 @@ func compareWithInt(m map[string]string, key string, op kind, v int) bool {
 	return false
 }
 
+func compareWithFloat(m map[string]string, key string, op kind, v float64) bool {
+	s, ok := m[key]
+	if !ok {
+		return false
+	}
+	p, err := strconv.ParseFloat(s, 32)
+	if err != nil {
+		switch op {
+		case k_eq:
+			return s[0] == '0'
+		case k_ne:
+			return s[0] != '0'
+		case k_gt:
+			return s[0] > '0'
+		case k_lt:
+			return s[0] < '0'
+		case k_ge:
+			return s[0] >= '0'
+		case k_le:
+			return s[0] <= '0'
+		}
+		return false
+	}
+
+	switch op {
+	case k_eq:
+		return p == v
+	case k_ne:
+		return p != v
+	case k_gt:
+		return p > v
+	case k_lt:
+		return p < v
+	case k_ge:
+		return p >= v
+	case k_le:
+		return p <= v
+	}
+	return false
+}
+
 func isLike(s string, v string) bool {
 	if v == "%" {
 		return true
@@ -231,4 +278,50 @@ func isLike(s string, v string) bool {
 		pt = pt[1:]
 	}
 	return len(s) == 0
+}
+
+// betweenOp represents a binary operation
+type betweenOp struct {
+	kind
+	test  expression
+	begin expression
+	end   expression
+}
+
+func (op betweenOp) String() string {
+	return fmt.Sprintf("%s BETWEEN %s AND %s", op.test, op.begin, op.end)
+}
+
+func (op betweenOp) match(do *dmp.Object) bool {
+	lv, ok := op.test.(token)
+	if !ok {
+		return false
+	}
+	tv, ok := do.Properties[lv.text]
+	if !ok {
+		return false
+	}
+	stk, ok := op.begin.(token)
+	if !ok {
+		return false
+	}
+	etk, ok := op.end.(token)
+	if !ok {
+		return false
+	}
+	if stk.kind == k_integer && etk.kind == k_integer {
+		if tv, err := strconv.Atoi(tv); err == nil {
+			sv, _ := strconv.Atoi(stk.text)
+			ev, _ := strconv.Atoi(etk.text)
+			return sv <= tv && tv <= ev
+		}
+	}
+	if stk.kind.match(k_decimal, k_integer) && etk.kind.match(k_decimal, k_integer) {
+		if tv, err := strconv.ParseFloat(tv, 32); err == nil {
+			sv, _ := strconv.ParseFloat(stk.text, 32)
+			ev, _ := strconv.ParseFloat(etk.text, 32)
+			return sv <= tv && tv <= ev
+		}
+	}
+	return stk.text <= tv && tv <= etk.text
 }

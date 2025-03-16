@@ -2,6 +2,7 @@ package list
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -9,11 +10,12 @@ type kind int
 
 const (
 	k_unknown kind = iota
-
+	k_parse_error
 	k_op_error
 
 	k_text
-	k_number
+	k_integer
+	k_decimal
 	k_pattern
 
 	k_comma
@@ -25,6 +27,9 @@ const (
 	k_le
 	k_gt
 	k_ge
+
+	k_minus
+	k_plus
 
 	k_like
 	k_and
@@ -39,6 +44,10 @@ const (
 	k_order
 	k_by
 )
+
+func (k kind) match(kinds ...kind) bool {
+	return slices.Contains(kinds, k)
+}
 
 var (
 	// opMap is a lookup for operator symbols
@@ -77,7 +86,7 @@ func (k kind) String() string {
 		return "unknown"
 	case k_text:
 		return "text"
-	case k_number:
+	case k_integer:
 		return "number"
 	case k_pattern:
 		return "pattern"
@@ -99,6 +108,10 @@ func (k kind) String() string {
 		return ">"
 	case k_ge:
 		return ">="
+	case k_minus:
+		return "-"
+	case k_plus:
+		return "+"
 	case k_like:
 		return "like"
 	case k_not:
@@ -171,8 +184,14 @@ func scan(s string) []token {
 			i++
 			tks = append(tks, token{pos: i, kind: k_comma})
 
-		case ccQuot:
+		case ccQuoteS:
 			n, tk := readQuote(data[i:])
+			tk.pos = i
+			i += n
+			tks = append(tks, tk)
+
+		case ccDigit:
+			n, tk := readNumber(data[i:])
 			tk.pos = i
 			i += n
 			tks = append(tks, tk)
@@ -258,6 +277,70 @@ func readQuote(data []byte) (int, token) {
 	}
 }
 
+func readDigits(data []byte) (int, token) {
+	p := 0
+	for ; p < len(data) && isDigit(data[p]); p++ {
+	}
+	return p, token{
+		kind: k_integer,
+		text: string(data[:p]),
+	}
+}
+
+func readNumber(data []byte) (int, token) {
+	k := k_integer
+	p := 0
+	if data[p] == '-' || data[p] == '+' {
+		p++
+	}
+	p, tk := readDigits(data[p:])
+	if p == len(data) || isSpace(data[p]) {
+		return p, tk
+	}
+	// decimal float number
+	if p < len(data) && data[p] == '.' {
+		k = k_decimal
+		p++
+		n, _ := readDigits(data[p:])
+		p += n
+	}
+	// exponential number
+	if p < len(data) && (data[p] == 'e' || data[p] == 'E') {
+		k = k_decimal
+		p++
+		if data[p] == '-' || data[p] == '+' {
+			p++
+		}
+		n, _ := readDigits(data[p:])
+		p += n
+		if p < len(data) && data[p] == '.' {
+			p++
+			n, _ := readDigits(data[p:])
+			p += n
+		}
+	}
+	if p < len(data) {
+		switch ccMap[data[p]] {
+		case ccAlpha, ccLowerCase, ccUpperCase:
+			return readWord(data)
+		case ccSpace, ccOperator, ccComma, ccParenClose, ccSymbol:
+			return p, token{
+				kind: k,
+				text: string(data[:p]),
+			}
+		default:
+			return p, token{
+				kind: k_parse_error,
+				text: string(data[:p]),
+			}
+		}
+	}
+	return p, token{
+		kind: k,
+		text: string(data[:p]),
+	}
+}
+
 func readWord(data []byte) (int, token) {
 	nc := 0
 	k := k_text
@@ -288,7 +371,7 @@ func readWord(data []byte) (int, token) {
 
 	// if all chars are digits then set to number
 	if nc == p {
-		k = k_number
+		k = k_integer
 	}
 
 	return p, token{
@@ -307,7 +390,8 @@ const (
 	ccLowerCase
 	ccUpperCase
 	ccOperator
-	ccQuot
+	ccQuoteS
+	ccQuoteD
 	ccParenOpen
 	ccParenClose
 	ccComma
@@ -332,12 +416,20 @@ var (
 
 		',': ccComma,
 
+		'/': ccSymbol,
+		'*': ccSymbol,
 		'%': ccSymbol,
+		'+': ccSymbol,
+		'-': ccSymbol,
+		'|': ccSymbol,
+
 		'.': ccAlpha,
 		'_': ccAlpha,
+		'@': ccAlpha,
+		'&': ccAlpha,
 
-		'"':  ccQuot,
-		'\'': ccQuot,
+		'"':  ccQuoteD,
+		'\'': ccQuoteS,
 
 		'0': ccDigit,
 		'1': ccDigit,
