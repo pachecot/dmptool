@@ -157,6 +157,47 @@ func (t token) match(do *dmp.Object) bool {
 	return strings.Contains(do.Name, t.text) || strings.Contains(do.Path, t.text)
 }
 
+// inOp represents a binary operation
+type inOp struct {
+	kind
+	lv    expression
+	items []expression
+}
+
+func (op inOp) String() string {
+	b := make([]byte, 0)
+	b = fmt.Appendf(b, "%s IN (", op.lv)
+	for i := range op.items {
+		if i > 0 {
+			b = fmt.Append(b, ", ")
+		}
+		b = fmt.Appendf(b, "%s", op.items[i])
+	}
+	b = fmt.Append(b, ")")
+	return string(b)
+}
+
+func (op inOp) match(do *dmp.Object) bool {
+	lv, ok := op.lv.(token)
+	if !ok {
+		return false
+	}
+	v, ok := do.Properties[lv.text]
+	if !ok {
+		return false
+	}
+	for i := range op.items {
+		rv, ok := op.items[i].(token)
+		if !ok {
+			continue
+		}
+		if v == rv.text {
+			return true
+		}
+	}
+	return false
+}
+
 // binOp represents a binary operation
 type binOp struct {
 	kind
@@ -359,6 +400,10 @@ func tokenize(s string) []token {
 			i += n
 			tks = append(tks, tk)
 
+		case ccComma:
+			i++
+			tks = append(tks, token{pos: i, kind: k_comma})
+
 		case ccQuot:
 			n, tk := readQuote(data[i:])
 			tk.pos = i
@@ -380,12 +425,41 @@ func tokenize(s string) []token {
 	return tks
 }
 
+func parseList(tks []token) (int, []expression) {
+	if len(tks) == 0 {
+		return 0, nil
+	}
+	if tks[0].kind != k_paren_left {
+		return 0, nil
+	}
+	list := make([]expression, 0)
+	n := 1
+	for n < len(tks) {
+		switch tks[n].kind {
+		case k_paren_right:
+			n++
+			return n, list
+		case k_comma:
+			n++
+			continue
+		default:
+			m, item := parse(tks[n:])
+			n += m
+			list = append(list, item)
+		}
+	}
+	return n, nil
+}
+
 func parse(tks []token) (int, expression) {
 	var last expression
 	inParen := false
 	for i := 0; i < len(tks); {
 		pos := tks[i].pos
 		switch k := tks[i].kind; k {
+
+		case k_comma:
+			return i, last
 
 		case k_text:
 			last = tks[i]
@@ -400,14 +474,26 @@ func parse(tks []token) (int, expression) {
 			i += n
 
 		case k_paren_right:
-			i++
 			if !inParen {
 				return i, last
 			}
+			i++
 			if last == nil {
 				return i, errOp{offset: pos}
 			}
 			inParen = false
+
+		case k_in:
+			i++
+			if last == nil || i >= len(tks) {
+				return i, errOp{offset: pos}
+			}
+			n, items := parseList(tks[i:])
+			i += n
+			last = inOp{
+				lv:    last,
+				items: items,
+			}
 
 		case k_like:
 			i++

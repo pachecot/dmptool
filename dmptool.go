@@ -127,7 +127,7 @@ is ascending by default, descending specific order can be specified with ASC or 
 
 	cc.Flags().StringVarP(&listCmd.OutFile, "output", "o", "", "output file to write to")
 	cc.Flags().StringSliceVarP(&listCmd.Ordering, "sort", "s", []string{}, "sort ordering of fields")
-	cc.Flags().StringSliceVarP(&listCmd.Filters, "where", "w", []string{}, "where like filter")
+	cc.Flags().StringVarP(&listCmd.Filter, "where", "w", "", "where like filter")
 	cc.Flags().StringSliceVarP(&listCmd.Names, "names", "n", []string{}, "filter with matching names")
 	cc.Flags().StringSliceVarP(&listCmd.Devices, "devices", "d", []string{}, "filter with matching device ids / paths")
 	cc.Flags().StringSliceVarP(&listCmd.Fields, "fields", "f", []string{"DeviceId", "Name", "Type"}, "list of fields to include")

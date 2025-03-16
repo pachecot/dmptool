@@ -16,12 +16,12 @@ import (
 
 type listHandler struct {
 	dmp.EmptyHandler
-	fields    []string
-	types     []string
-	names     []string
-	devices   []string
-	results   []*dmp.Object
-	whereExps []expression
+	fields   []string
+	types    []string
+	names    []string
+	devices  []string
+	results  []*dmp.Object
+	whereExp expression
 }
 
 const (
@@ -47,9 +47,7 @@ func (h *listHandler) Object(do *dmp.Object) {
 		return
 	}
 
-	if len(h.whereExps) > 0 && !slices.ContainsFunc(h.whereExps, func(exp expression) bool {
-		return exp.match(do)
-	}) {
+	if h.whereExp != nil && !h.whereExp.match(do) {
 		return
 	}
 
@@ -61,7 +59,7 @@ type Command struct {
 	OutFile  string
 	Fields   []string
 	Types    []string
-	Filters  []string
+	Filter   string
 	Names    []string
 	Devices  []string
 	Ordering []string
@@ -76,8 +74,8 @@ func (cmd *Command) Execute() {
 		types:   cmd.Types,
 	}
 
-	for _, f := range cmd.Filters {
-		h.whereExps = append(h.whereExps, parseWhere(f))
+	if cmd.Filter != "" {
+		h.whereExp = parseWhere(cmd.Filter)
 	}
 
 	dmp.ParseFile(cmd.FileName, h)
