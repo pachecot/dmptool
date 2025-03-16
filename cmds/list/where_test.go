@@ -64,14 +64,14 @@ func TestParseWhere(t *testing.T) {
 			if !ok {
 				t.Errorf("Expected binOp.")
 			}
-			if tk, ok := op.lv.(token); !ok || tk.p != test.key {
-				t.Errorf("Expected %v , but got %v", test.key, tk.p)
+			if tk, ok := op.lv.(token); !ok || tk.text != test.key {
+				t.Errorf("Expected %v , but got %v", test.key, tk.text)
 			}
 			if tk := op.kind; tk.String() != test.op {
 				t.Errorf("Expected %v , but got %s", test.op, tk)
 			}
-			if tk, ok := op.rv.(token); !ok || tk.p != test.value {
-				t.Errorf("Expected %v , but got %v", test.value, tk.p)
+			if tk, ok := op.rv.(token); !ok || tk.text != test.value {
+				t.Errorf("Expected %v , but got %v", test.value, tk.text)
 			}
 		})
 	}

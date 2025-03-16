@@ -19,37 +19,61 @@ type kind int
 
 const (
 	k_unknown kind = iota
+
+	k_op_error
+
 	k_text
 	k_number
 	k_pattern
-	k_paren_op
-	k_paren_cl
+
+	k_comma
+	k_paren_left
+	k_paren_right
 	k_eq
 	k_ne
 	k_lt
 	k_le
 	k_gt
 	k_ge
+
 	k_like
 	k_and
 	k_or
+	k_in
+	k_null
+	k_where
+	k_between
+	k_select
 	k_not
-	k_op_error
+	k_order
+	k_by
 )
 
 var (
-	km = map[string]kind{
-		"=":    k_eq,
-		"==":   k_eq,
-		"!=":   k_ne,
-		"<":    k_lt,
-		">":    k_gt,
-		"<=":   k_le,
-		">=":   k_ge,
-		"like": k_like,
-		"not":  k_not,
-		"and":  k_and,
-		"or":   k_or,
+	// opMap is a lookup for operator symbols
+	opMap = map[string]kind{
+		"=":  k_eq,
+		"==": k_eq,
+		"!=": k_ne,
+		"<":  k_lt,
+		">":  k_gt,
+		"<=": k_le,
+		">=": k_ge,
+	}
+
+	// kwMap is a lookup for key words
+	kwMap = map[string]kind{
+		"like":    k_like,
+		"not":     k_not,
+		"and":     k_and,
+		"or":      k_or,
+		"in":      k_in,
+		"where":   k_where,
+		"select":  k_select,
+		"between": k_between,
+		"null":    k_null,
+		"order":   k_order,
+		"by":      k_by,
 	}
 )
 
@@ -64,9 +88,9 @@ func (k kind) String() string {
 		return "number"
 	case k_pattern:
 		return "pattern"
-	case k_paren_op:
+	case k_paren_left:
 		return "("
-	case k_paren_cl:
+	case k_paren_right:
 		return ")"
 	case k_op_error:
 		return "op_error"
@@ -90,24 +114,42 @@ func (k kind) String() string {
 		return "and"
 	case k_or:
 		return "or"
+	case k_comma:
+		return ","
+	case k_between:
+		return "between"
+	case k_null:
+		return "null"
+	case k_in:
+		return "in"
+	case k_select:
+		return "select"
+	case k_where:
+		return "where"
+	case k_order:
+		return "order"
+	case k_by:
+		return "by"
+	default:
+		panic(fmt.Sprintf("unexpected list.kind: %#v", k))
 	}
-	return "unknown"
 }
 
 type token struct {
 	kind
-	p string
+	pos  int
+	text string
 }
 
 func (t token) String() string {
-	if t.p == "" {
+	if t.text == "" {
 		return t.kind.String()
 	}
-	return fmt.Sprintf("%s(%s)", t.kind, t.p)
+	return fmt.Sprintf("%s(%s)", t.kind, t.text)
 }
 
 func (t token) match(do *dmp.Object) bool {
-	return strings.Contains(do.Name, t.p) || strings.Contains(do.Path, t.p)
+	return strings.Contains(do.Name, t.text) || strings.Contains(do.Path, t.text)
 }
 
 type binOp struct {
@@ -121,32 +163,35 @@ func (op binOp) String() string {
 }
 
 func (op binOp) match(do *dmp.Object) bool {
+
 	switch op.kind {
+
 	case k_and:
 		return op.lv.match(do) && op.rv.match(do)
+
 	case k_or:
 		return op.lv.match(do) || op.rv.match(do)
+
 	case k_like:
 		lv := op.lv.(token)
 		rv := op.rv.(token)
-		return isLike(do.Properties[lv.p], rv.p)
+		return isLike(do.Properties[lv.text], rv.text)
+
 	default:
 		lv := op.lv.(token)
 		rv := op.rv.(token)
+
 		switch rv.kind {
+
 		case k_number:
-			left, ok := do.Properties[lv.p]
-			if !ok {
-				return false
+			if rn, err := strconv.Atoi(rv.text); err == nil {
+				return compareWithInt(do.Properties, lv.text, op.kind, rn)
 			}
-			if ln, err := strconv.Atoi(left); err == nil {
-				if rn, err := strconv.Atoi(rv.p); err == nil {
-					return compareWithInt(op.kind, ln, rn)
-				}
-			}
-			return compareWith(op.kind, do.Properties[lv.p], rv.p)
+			return compareWith(do.Properties, lv.text, op.kind, rv.text)
+
 		default:
-			return compareWith(op.kind, do.Properties[lv.p], rv.p)
+			return compareWith(do.Properties, lv.text, op.kind, rv.text)
+
 		}
 	}
 }
@@ -171,6 +216,7 @@ func (op uniOp) match(do *dmp.Object) bool {
 
 type errOp struct {
 	kind
+	offset int
 }
 
 func (op errOp) match(do *dmp.Object) bool {
@@ -178,29 +224,16 @@ func (op errOp) match(do *dmp.Object) bool {
 }
 
 func isSpace(c byte) bool {
-	switch c {
-	case ' ':
-		return true
-	default:
-		return false
-	}
+	return ccMap[c] == ccSpace
 }
 
 func isOperator(c byte) bool {
-	switch c {
-	case '=', '!', '<', '>':
-		return true
-	default:
-		return false
-	}
+	return ccMap[c] == ccOperator
 }
 
 func isWord(c byte) bool {
-	if ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') {
-		return true
-	}
-	switch c {
-	case '_', '.':
+	switch ccMap[c] {
+	case ccLowerCase, ccUpperCase, ccAlpha:
 		return true
 	default:
 		return false
@@ -208,7 +241,7 @@ func isWord(c byte) bool {
 }
 
 func isDigit(c byte) bool {
-	return '0' <= c && c <= '9'
+	return ccMap[c] == ccDigit
 }
 
 func skipSpace(data []byte) int {
@@ -226,16 +259,16 @@ func readOperator(data []byte) (int, token) {
 	}
 	s := string(data[:p])
 	lc := strings.ToLower(s)
-	k, ok := km[lc]
+	k, ok := opMap[lc]
 	if !ok {
 		return p, token{
 			kind: k_op_error,
-			p:    s,
+			text: s,
 		}
 	}
 	tk := token{
 		kind: k,
-		p:    s,
+		text: s,
 	}
 	return p, tk
 }
@@ -247,12 +280,12 @@ func readQuote(data []byte) (int, token) {
 	}
 	s := string(data[1:p])
 	if p == len(data) {
-		return p, token{kind: k_op_error}
+		return p, token{kind: k_unknown}
 	}
 	p++
 	return p, token{
 		kind: k_text,
-		p:    s,
+		text: s,
 	}
 }
 
@@ -278,7 +311,7 @@ func readWord(data []byte) (int, token) {
 
 	// test for key words
 	lc := strings.ToLower(s)
-	if kw, ok := km[lc]; ok {
+	if kw, ok := kwMap[lc]; ok {
 		return p, token{
 			kind: kw,
 		}
@@ -291,7 +324,7 @@ func readWord(data []byte) (int, token) {
 
 	return p, token{
 		kind: k,
-		p:    s,
+		text: s,
 	}
 }
 
@@ -299,31 +332,42 @@ func tokenize(s string) []token {
 	tks := make([]token, 0)
 	data := []byte(s)
 	for i := 0; i < len(data); {
-		switch data[i] {
-		case '(':
+
+		switch ccMap[data[i]] {
+
+		case ccParenOpen:
 			i++
-			tks = append(tks, token{kind: k_paren_op})
-		case ')':
+			tks = append(tks, token{pos: i, kind: k_paren_left})
+
+		case ccParenClose:
 			i++
-			tks = append(tks, token{kind: k_paren_cl})
-		case ' ':
+			tks = append(tks, token{pos: i, kind: k_paren_right})
+
+		case ccSpace:
 			i += skipSpace(data[i:])
-		case '!', '=', '<', '>':
+
+		case ccOperator:
 			n, tk := readOperator(data[i:])
+			tk.pos = i
 			i += n
 			tks = append(tks, tk)
-		case '"', '\'':
+
+		case ccQuot:
 			n, tk := readQuote(data[i:])
+			tk.pos = i
 			i += n
 			tks = append(tks, tk)
+
 		default:
 			n, tk := readWord(data[i:])
+			tk.pos = i
 			if n == 0 {
 				i++
 				continue
 			}
 			i += n
 			tks = append(tks, tk)
+
 		}
 	}
 	return tks
@@ -333,6 +377,7 @@ func parse(tks []token) (int, expression) {
 	var last expression
 	inParen := false
 	for i := 0; i < len(tks); {
+		pos := tks[i].pos
 		switch k := tks[i].kind; k {
 
 		case k_text:
@@ -340,53 +385,62 @@ func parse(tks []token) (int, expression) {
 			i++
 			continue
 
-		case k_paren_op:
+		case k_paren_left:
 			inParen = true
 			var n int
 			i++
 			n, last = parse(tks[i:])
 			i += n
 
-		case k_paren_cl:
+		case k_paren_right:
 			i++
 			if !inParen {
 				return i, last
 			}
 			if last == nil {
-				return i, errOp{kind: k_op_error}
+				return i, errOp{offset: pos}
 			}
 			inParen = false
 
 		case k_like:
 			i++
 			if last == nil || i >= len(tks) {
-				return i, errOp{kind: k_op_error}
+				return i, errOp{offset: pos}
 			}
 			next := tks[i]
 			i++
-			if next.kind != k_text && next.kind != k_pattern {
-				return i, errOp{kind: k_op_error}
-			}
-			last = binOp{
-				kind: k,
-				lv:   last,
-				rv:   next,
+			switch next.kind {
+
+			case k_text, k_pattern:
+				last = binOp{
+					kind: k,
+					lv:   last,
+					rv:   next,
+				}
+
+			default:
+				return i, errOp{offset: pos}
 			}
 
 		case k_eq, k_ne, k_lt, k_le, k_gt, k_ge:
 			i++
 			if last == nil || i >= len(tks) {
-				return i, errOp{kind: k_op_error}
+				return i, errOp{offset: pos}
 			}
 			next := tks[i]
 			i++
-			if next.kind != k_text && next.kind != k_number {
-				return i, errOp{kind: k_op_error}
-			}
-			last = binOp{
-				kind: k,
-				lv:   last,
-				rv:   next,
+			switch next.kind {
+
+			case k_text, k_number, k_null:
+				last = binOp{
+					kind: k,
+					lv:   last,
+					rv:   next,
+				}
+
+			default:
+				return i, errOp{offset: pos}
+
 			}
 
 		case k_and, k_or:
@@ -409,7 +463,7 @@ func parse(tks []token) (int, expression) {
 			}
 
 		default:
-			return i, errOp{kind: k_op_error}
+			return i, errOp{offset: pos}
 		}
 	}
 	return len(tks), last
@@ -417,18 +471,18 @@ func parse(tks []token) (int, expression) {
 
 func parseWhere(f string) expression {
 	tks := tokenize(f)
-	n, e := parse(tks)
-	if _, ok := e.(errOp); ok {
-		fmt.Println("error parsing where at ", n)
+	_, exp := parse(tks)
+	if op, ok := exp.(errOp); ok {
+		fmt.Printf("error parsing where at : %d\n", op.offset)
 	}
-	if n < len(tks) {
-		fmt.Println("error parsing where incomplete ", n, len(tks))
-	}
-	return e
+	return exp
 }
 
-func compareWith(op kind, p, v string) bool {
-
+func compareWith(m map[string]string, key string, op kind, v string) bool {
+	p, ok := m[key]
+	if !ok {
+		return false
+	}
 	switch op {
 	case k_eq:
 		return p == v
@@ -446,7 +500,30 @@ func compareWith(op kind, p, v string) bool {
 	return false
 }
 
-func compareWithInt(op kind, p, v int) bool {
+func compareWithInt(m map[string]string, key string, op kind, v int) bool {
+	s, ok := m[key]
+	if !ok {
+		return false
+	}
+	p, err := strconv.Atoi(s)
+	if err != nil {
+		switch op {
+		case k_eq:
+			return s[0] == '0'
+		case k_ne:
+			return s[0] != '0'
+		case k_gt:
+			return s[0] > '0'
+		case k_lt:
+			return s[0] < '0'
+		case k_ge:
+			return s[0] >= '0'
+		case k_le:
+			return s[0] <= '0'
+		}
+		return false
+	}
+
 	switch op {
 	case k_eq:
 		return p == v
@@ -500,3 +577,112 @@ func isLike(s string, v string) bool {
 	}
 	return len(s) == 0
 }
+
+type ccType int
+
+const (
+	ccNA    ccType = 0
+	ccSpace ccType = 1 << iota
+	ccDigit
+	ccAlpha
+	ccLowerCase
+	ccUpperCase
+	ccOperator
+	ccQuot
+	ccParenOpen
+	ccParenClose
+	ccComma
+	ccSymbol
+)
+
+var (
+	ccMap = [256]ccType{
+
+		' ':  ccSpace,
+		'\n': ccSpace,
+		'\r': ccSpace,
+		'\t': ccSpace,
+
+		'!': ccOperator,
+		'<': ccOperator,
+		'=': ccOperator,
+		'>': ccOperator,
+
+		'(': ccParenOpen,
+		')': ccParenClose,
+
+		',': ccComma,
+
+		'%': ccSymbol,
+		'.': ccAlpha,
+		'_': ccAlpha,
+
+		'"':  ccQuot,
+		'\'': ccQuot,
+
+		'0': ccDigit,
+		'1': ccDigit,
+		'2': ccDigit,
+		'3': ccDigit,
+		'4': ccDigit,
+		'5': ccDigit,
+		'6': ccDigit,
+		'7': ccDigit,
+		'8': ccDigit,
+		'9': ccDigit,
+
+		'A': ccUpperCase,
+		'B': ccUpperCase,
+		'C': ccUpperCase,
+		'D': ccUpperCase,
+		'E': ccUpperCase,
+		'F': ccUpperCase,
+		'G': ccUpperCase,
+		'H': ccUpperCase,
+		'I': ccUpperCase,
+		'J': ccUpperCase,
+		'K': ccUpperCase,
+		'L': ccUpperCase,
+		'M': ccUpperCase,
+		'N': ccUpperCase,
+		'O': ccUpperCase,
+		'P': ccUpperCase,
+		'Q': ccUpperCase,
+		'R': ccUpperCase,
+		'S': ccUpperCase,
+		'T': ccUpperCase,
+		'U': ccUpperCase,
+		'V': ccUpperCase,
+		'W': ccUpperCase,
+		'X': ccUpperCase,
+		'Y': ccUpperCase,
+		'Z': ccUpperCase,
+
+		'a': ccLowerCase,
+		'b': ccLowerCase,
+		'c': ccLowerCase,
+		'd': ccLowerCase,
+		'e': ccLowerCase,
+		'f': ccLowerCase,
+		'g': ccLowerCase,
+		'h': ccLowerCase,
+		'i': ccLowerCase,
+		'j': ccLowerCase,
+		'k': ccLowerCase,
+		'l': ccLowerCase,
+		'm': ccLowerCase,
+		'n': ccLowerCase,
+		'o': ccLowerCase,
+		'p': ccLowerCase,
+		'q': ccLowerCase,
+		'r': ccLowerCase,
+		's': ccLowerCase,
+		't': ccLowerCase,
+		'u': ccLowerCase,
+		'v': ccLowerCase,
+		'w': ccLowerCase,
+		'x': ccLowerCase,
+		'y': ccLowerCase,
+		'z': ccLowerCase,
+	}
+)
