@@ -13,7 +13,8 @@ const (
 	k_parse_error
 	k_op_error
 
-	k_text
+	k_field
+	k_string
 	k_integer
 	k_decimal
 	k_pattern
@@ -84,10 +85,14 @@ func (k kind) String() string {
 	switch k {
 	case k_unknown:
 		return "unknown"
-	case k_text:
-		return "text"
+	case k_string:
+		return "string"
+	case k_field:
+		return "field"
+	case k_decimal:
+		return "decimal"
 	case k_integer:
-		return "number"
+		return "integer"
 	case k_pattern:
 		return "pattern"
 	case k_paren_left:
@@ -272,7 +277,7 @@ func readQuote(data []byte) (int, token) {
 	}
 	p++
 	return p, token{
-		kind: k_text,
+		kind: k_string,
 		text: s,
 	}
 }
@@ -343,7 +348,7 @@ func readNumber(data []byte) (int, token) {
 
 func readWord(data []byte) (int, token) {
 	nc := 0
-	k := k_text
+	k := k_field
 	p := 0
 	for ; p < len(data); p++ {
 		if isWord(data[p]) {

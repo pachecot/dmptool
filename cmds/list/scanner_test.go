@@ -10,51 +10,51 @@ func TestScan(t *testing.T) {
 		input    string
 		expected []token
 	}{
-		{"Case 1", "name = John", []token{{kind: k_text, text: "name"}, {kind: k_eq, text: "="}, {kind: k_text, text: "John"}}},
-		{"Case 1b", "name == John", []token{{kind: k_text, text: "name"}, {kind: k_eq, text: "=="}, {kind: k_text, text: "John"}}},
-		{"Case 2", "name != John", []token{{kind: k_text, text: "name"}, {kind: k_ne, text: "!="}, {kind: k_text, text: "John"}}},
-		{"Case 3", "name > John", []token{{kind: k_text, text: "name"}, {kind: k_gt, text: ">"}, {kind: k_text, text: "John"}}},
-		{"Case 4", "name < John", []token{{kind: k_text, text: "name"}, {kind: k_lt, text: "<"}, {kind: k_text, text: "John"}}},
-		{"Case 5", "name >= John", []token{{kind: k_text, text: "name"}, {kind: k_ge, text: ">="}, {kind: k_text, text: "John"}}},
-		{"Case 6", "name <= John", []token{{kind: k_text, text: "name"}, {kind: k_le, text: "<="}, {kind: k_text, text: "John"}}},
-		{"Case 7", "name like John", []token{{kind: k_text, text: "name"}, {kind: k_like, text: ""}, {kind: k_text, text: "John"}}},
-		{"Case 8", "(A,B,C)", []token{
+		{"Case 1", "name = 'John'", []token{{kind: k_field, text: "name"}, {kind: k_eq, text: "="}, {kind: k_string, text: "John"}}},
+		{"Case 1b", "name == 'John'", []token{{kind: k_field, text: "name"}, {kind: k_eq, text: "=="}, {kind: k_string, text: "John"}}},
+		{"Case 2", "name != 'John'", []token{{kind: k_field, text: "name"}, {kind: k_ne, text: "!="}, {kind: k_string, text: "John"}}},
+		{"Case 3", "name > 'John'", []token{{kind: k_field, text: "name"}, {kind: k_gt, text: ">"}, {kind: k_string, text: "John"}}},
+		{"Case 4", "name < 'John'", []token{{kind: k_field, text: "name"}, {kind: k_lt, text: "<"}, {kind: k_string, text: "John"}}},
+		{"Case 5", "name >= 'John'", []token{{kind: k_field, text: "name"}, {kind: k_ge, text: ">="}, {kind: k_string, text: "John"}}},
+		{"Case 6", "name <= 'John'", []token{{kind: k_field, text: "name"}, {kind: k_le, text: "<="}, {kind: k_string, text: "John"}}},
+		{"Case 7", "name like 'John'", []token{{kind: k_field, text: "name"}, {kind: k_like, text: ""}, {kind: k_string, text: "John"}}},
+		{"Case 8", "('A','B','C')", []token{
 			{kind: k_paren_left, text: ""},
-			{kind: k_text, text: "A"},
+			{kind: k_string, text: "A"},
 			{kind: k_comma, text: ""},
-			{kind: k_text, text: "B"},
+			{kind: k_string, text: "B"},
 			{kind: k_comma, text: ""},
-			{kind: k_text, text: "C"},
+			{kind: k_string, text: "C"},
 			{kind: k_paren_right, text: ""},
 		}},
-		{"Case 9", " X IN ( A, B, C ) ", []token{
-			{kind: k_text, text: "X"},
+		{"Case 9", " X IN ( 'A', 'B', 'C' ) ", []token{
+			{kind: k_field, text: "X"},
 			{kind: k_in, text: ""},
 			{kind: k_paren_left, text: ""},
-			{kind: k_text, text: "A"},
+			{kind: k_string, text: "A"},
 			{kind: k_comma, text: ""},
-			{kind: k_text, text: "B"},
+			{kind: k_string, text: "B"},
 			{kind: k_comma, text: ""},
-			{kind: k_text, text: "C"},
+			{kind: k_string, text: "C"},
 			{kind: k_paren_right, text: ""},
 		}},
-		{"Case 10", " X BETWEEN A AND B ", []token{
-			{kind: k_text, text: "X"},
+		{"Case 10", " X BETWEEN 'A' AND 'B' ", []token{
+			{kind: k_field, text: "X"},
 			{kind: k_between, text: ""},
-			{kind: k_text, text: "A"},
+			{kind: k_string, text: "A"},
 			{kind: k_and, text: ""},
-			{kind: k_text, text: "B"},
+			{kind: k_string, text: "B"},
 		}},
-		{"Case 11", " X BETWEEN A AND B AND Y < C", []token{
-			{kind: k_text, text: "X"},
+		{"Case 11", " X BETWEEN 'A' AND 'B' AND Y < 'C'", []token{
+			{kind: k_field, text: "X"},
 			{kind: k_between, text: ""},
-			{kind: k_text, text: "A"},
+			{kind: k_string, text: "A"},
 			{kind: k_and, text: ""},
-			{kind: k_text, text: "B"},
+			{kind: k_string, text: "B"},
 			{kind: k_and, text: ""},
-			{kind: k_text, text: "Y"},
+			{kind: k_field, text: "Y"},
 			{kind: k_lt, text: "<"},
-			{kind: k_text, text: "C"},
+			{kind: k_string, text: "C"},
 		}},
 	}
 
@@ -90,8 +90,8 @@ func TestScanNumbers(t *testing.T) {
 		{"Case 3", "123e123", []kind{k_decimal}},
 		{"Case 4", "123.013e13", []kind{k_decimal}},
 		{"Case 5", "123.013e13>123", []kind{k_decimal, k_gt, k_integer}},
-		{"Case 6", "123.013e13AAA", []kind{k_text}},
-		{"Case 7", "123 AAA", []kind{k_integer, k_text}},
+		{"Case 6", "123.013e13AAA", []kind{k_field}},
+		{"Case 7", "123 AAA", []kind{k_integer, k_field}},
 	}
 
 	// Run tests

@@ -12,14 +12,14 @@ func TestParseWhere(t *testing.T) {
 		op    string
 		value string
 	}{
-		{"Case 1", "name = John", "name", "=", "John"},
-		{"Case 1b", "name == John", "name", "=", "John"},
-		{"Case 2", "name != John", "name", "!=", "John"},
-		{"Case 3", "name > John", "name", ">", "John"},
-		{"Case 4", "name < John", "name", "<", "John"},
-		{"Case 5", "name >= John", "name", ">=", "John"},
-		{"Case 6", "name <= John", "name", "<=", "John"},
-		{"Case 7", "name like John", "name", "like", "John"},
+		{"Case 1", "name = 'John'", "name", "=", "John"},
+		{"Case 1b", "name == 'John'", "name", "=", "John"},
+		{"Case 2", "name != 'John'", "name", "!=", "John"},
+		{"Case 3", "name > 'John'", "name", ">", "John"},
+		{"Case 4", "name < 'John'", "name", "<", "John"},
+		{"Case 5", "name >= 'John'", "name", ">=", "John"},
+		{"Case 6", "name <= 'John'", "name", "<=", "John"},
+		{"Case 7", "name like 'John'", "name", "like", "John"},
 	}
 
 	// Run tests
@@ -52,28 +52,28 @@ func TestParse(t *testing.T) {
 		expected expression
 	}{
 		{"Case 1",
-			"(Name = A) OR (Name = B)",
+			"(Name = 'A') OR (Name = 'B')",
 			binOp{
 				kind: k_or,
 				lv: binOp{
 					kind: k_eq,
 					lv: token{
-						kind: k_text,
+						kind: k_field,
 						text: "Name",
 					},
 					rv: token{
-						kind: k_text,
+						kind: k_string,
 						text: "A",
 					},
 				},
 				rv: binOp{
 					kind: k_eq,
 					lv: token{
-						kind: k_text,
+						kind: k_field,
 						text: "Name",
 					},
 					rv: token{
-						kind: k_text,
+						kind: k_string,
 						text: "B",
 					},
 				},
@@ -103,12 +103,12 @@ func TestParse(t *testing.T) {
 }
 
 func TestParseList(t *testing.T) {
-	input := "(A,B,C,D)"
+	input := "('A','B','C','D')"
 	expect := []expression{
-		token{kind: k_text, text: "A"},
-		token{kind: k_text, text: "B"},
-		token{kind: k_text, text: "C"},
-		token{kind: k_text, text: "D"},
+		token{kind: k_string, text: "A"},
+		token{kind: k_string, text: "B"},
+		token{kind: k_string, text: "C"},
+		token{kind: k_string, text: "D"},
 	}
 	tks := scan(input)
 	n, result := parseList(tks)
@@ -122,12 +122,12 @@ func TestParseList(t *testing.T) {
 }
 
 func TestParseBetween(t *testing.T) {
-	input := "X BETWEEN A AND B"
+	input := "X BETWEEN 'A' AND 'B'"
 	expect := betweenOp{
 		kind:  k_between,
-		test:  token{kind: k_text, text: "X"},
-		begin: token{kind: k_text, text: "A"},
-		end:   token{kind: k_text, text: "B"},
+		test:  token{kind: k_field, text: "X"},
+		begin: token{kind: k_string, text: "A"},
+		end:   token{kind: k_string, text: "B"},
 	}
 	tks := scan(input)
 	n, result := parse(tks)
@@ -144,19 +144,19 @@ func TestParseBetween(t *testing.T) {
 }
 
 func TestParseBetweenAnd(t *testing.T) {
-	input := "X BETWEEN A AND B AND Y < C"
+	input := "X BETWEEN 'A' AND 'B' AND Y < 'C'"
 	expect := binOp{
 		kind: k_and,
 		lv: betweenOp{
 			kind:  k_between,
-			test:  token{kind: k_text, text: "X"},
-			begin: token{kind: k_text, text: "A"},
-			end:   token{kind: k_text, text: "B"},
+			test:  token{kind: k_field, text: "X"},
+			begin: token{kind: k_string, text: "A"},
+			end:   token{kind: k_string, text: "B"},
 		},
 		rv: binOp{
 			kind: k_lt,
-			lv:   token{kind: k_text, text: "Y"},
-			rv:   token{kind: k_text, text: "C"},
+			lv:   token{kind: k_field, text: "Y"},
+			rv:   token{kind: k_string, text: "C"},
 		},
 	}
 	tks := scan(input)
@@ -179,25 +179,25 @@ func TestParseBetweenAnd(t *testing.T) {
 }
 
 func TestParseAndAnd(t *testing.T) {
-	input := "X = A AND Y > B AND Z < C"
+	input := "X = 'A' AND Y > 'B' AND Z < 'C'"
 	expect := binOp{
 		kind: k_and,
 		lv: binOp{
 			kind: k_eq,
-			lv:   token{kind: k_text, text: "X"},
-			rv:   token{kind: k_text, text: "A"},
+			lv:   token{kind: k_field, text: "X"},
+			rv:   token{kind: k_string, text: "A"},
 		},
 		rv: binOp{
 			kind: k_and,
 			lv: binOp{
 				kind: k_gt,
-				lv:   token{kind: k_text, text: "Y"},
-				rv:   token{kind: k_text, text: "B"},
+				lv:   token{kind: k_field, text: "Y"},
+				rv:   token{kind: k_string, text: "B"},
 			},
 			rv: binOp{
 				kind: k_lt,
-				lv:   token{kind: k_text, text: "Z"},
-				rv:   token{kind: k_text, text: "C"},
+				lv:   token{kind: k_field, text: "Z"},
+				rv:   token{kind: k_string, text: "C"},
 			},
 		},
 	}
