@@ -122,9 +122,28 @@ func (op uniOp) String() string {
 }
 
 func (op uniOp) match(do *dmp.Object) bool {
+
 	switch op.kind {
+
 	case k_not:
 		return !op.rv.match(do)
+
+	case k_is_not_null:
+		tk, ok := op.rv.(token)
+		if !ok || tk.kind != k_field {
+			return false
+		}
+		_, ok = do.Properties[tk.text]
+		return ok
+
+	case k_is_null:
+		tk, ok := op.rv.(token)
+		if !ok || tk.kind != k_field {
+			return false
+		}
+		_, ok = do.Properties[tk.text]
+		return !ok
+
 	default:
 		return false
 	}

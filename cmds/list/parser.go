@@ -165,14 +165,19 @@ func parse(tks []token) (int, expression) {
 				rv:   rest,
 			}
 
+		case k_is_null, k_is_not_null:
+			i++
+			tk, ok := last.(token)
+			if !ok || tk.kind != k_field {
+				return i, errOp{offset: pos}
+			}
+			last = uniOp{kind: k, rv: tk}
+
 		case k_not:
 			i++
 			n, rest := parse(tks[i:])
 			i += n
-			return i, uniOp{
-				kind: k,
-				rv:   rest,
-			}
+			return i, uniOp{kind: k, rv: rest}
 
 		default:
 			return i, errOp{offset: pos}

@@ -37,6 +37,8 @@ const (
 	k_or
 	k_in
 	k_is
+	k_is_null
+	k_is_not_null
 	k_null
 	k_where
 	k_between
@@ -65,18 +67,20 @@ var (
 
 	// kwMap is a lookup for key words
 	kwMap = map[string]kind{
-		"like":    k_like,
-		"not":     k_not,
-		"and":     k_and,
-		"or":      k_or,
-		"in":      k_in,
-		"where":   k_where,
-		"select":  k_select,
-		"between": k_between,
-		"null":    k_null,
-		"order":   k_order,
-		"by":      k_by,
-		"is":      k_by,
+		"like":      k_like,
+		"not":       k_not,
+		"and":       k_and,
+		"or":        k_or,
+		"in":        k_in,
+		"where":     k_where,
+		"select":    k_select,
+		"between":   k_between,
+		"null":      k_null,
+		"order":     k_order,
+		"by":        k_by,
+		"is":        k_is,
+		"isnull":    k_is_null,
+		"isnotnull": k_is_not_null,
 	}
 )
 
@@ -135,6 +139,10 @@ func (k kind) String() string {
 		return "in"
 	case k_is:
 		return "is"
+	case k_is_null:
+		return "isnull"
+	case k_is_not_null:
+		return "isnotnull"
 	case k_select:
 		return "select"
 	case k_where:
