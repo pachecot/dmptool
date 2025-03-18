@@ -57,7 +57,7 @@ func (o ordering) compare(a, b []string) int {
 		return sign
 	}
 	if len(xs2) > len(xs1) {
-		return sign
+		return -sign
 	}
 	return 0
 }
@@ -114,7 +114,10 @@ func reorder(orders []string, fields []string, table [][]string) error {
 
 func partitionDigits(s string) []string {
 	r := make([]string, 0)
-	inDigit := false
+	if len(s) == 0 {
+		return []string{""}
+	}
+	inDigit := isDigit(s[0])
 	left := 0
 	for i := range s {
 		if isDigit(s[i]) {
