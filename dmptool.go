@@ -27,25 +27,25 @@ func newCmdPE() *cobra.Command {
 	cc := &cobra.Command{
 		Use:   "pe <dump file> [output directory]",
 		Short: "extracts all PE program files into individual files",
-		Long: `This command will extract all the PE program files from the dump file. 
+		Long: `This command will extract all the PE program files from the dump file.
 
-The PE program files will be written to the output directory. The output directory 
-can be specified as the second argument. If the, output directory is not specified, 
-then the files will be written to the current directory. 
+The PE program files will be written to the output directory. The output directory
+can be specified as the second argument. If the, output directory is not specified,
+then the files will be written to the current directory.
 
-A directory will be created for each object. The directory will be named with the 
-device path of the object. The PE program file will be written to the directory. 
+A directory will be created for each object. The directory will be named with the
+device path of the object. The PE program file will be written to the directory.
 The PE program file will be named with the object name and the extension .pe.
 
-The output files can be flattened to a single name. If the --flatten flag is set, 
-then the file path will be flattened to a single name. The separator used to flatten 
-the file path can be specified with the --separator flag. The default separator is "~". 
+The output files can be flattened to a single name. If the --flatten flag is set,
+then the file path will be flattened to a single name. The separator used to flatten
+the file path can be specified with the --separator flag. The default separator is "~".
 
-The output files can be organized by the type of object. If the --type flag is set, 
-then the files will be organized by the type of object. The type of object will be used 
+The output files can be organized by the type of object. If the --type flag is set,
+then the files will be organized by the type of object. The type of object will be used
 as a sub folder for the files.
 
-The --prefix flag set a prefix for the type folders. The default prefix is "__". 
+The --prefix flag set a prefix for the type folders. The default prefix is "__".
 
 		DeviceName
 			__Program
@@ -79,48 +79,48 @@ func newCmdList() *cobra.Command {
 	cc := &cobra.Command{
 		Use:   "list <dump file>",
 		Short: "extracts list of objects into list",
-		Long: `This command will extract the list of objects from the dump file. The list can 
-be filtered by the type of object, the name of the object, the device id or 
-path, and the properties of the object. The output can be written to a file in 
-text, csv or xlsx formats.	
+		Long: `This command will extract the list of objects from the dump file. The list can
+be filtered by the type of object, the name of the object, the device id or
+path, and the properties of the object. The output can be written to a file in
+text, csv or xlsx formats.
 
-The output file can be specified with the --output flag. If the file extension 
+The output file can be specified with the --output flag. If the file extension
 is .csv, then the output will be in csv format. If the file extension is .xlsx,
 then the output will be in xlsx format. If the file extension is not recognized,
 then the output will be written as a plain text. If the output is not specified
 then the output is to the console.
 
-The fields to include in the output can be specified with the --fields flag. 
-The default fields are DeviceId, Name, and Type. The fields can be any of the 
-properties of the object. The flag can be specified multiple times. The flag 
+The fields to include in the output can be specified with the --fields flag.
+The default fields are DeviceId, Name, and Type. The fields can be any of the
+properties of the object. The flag can be specified multiple times. The flag
 can also be specified in the format of "field1,field2,field3".
 
 The types of objects to include in the output can be specified with the --types
-flag. The flag can be specified multiple times. The flag can also be specified 
+flag. The flag can be specified multiple times. The flag can also be specified
 in the format of "type1,type2,type3".
 
-The names of the objects to include in the output can be specified with the 
---names flag. The flag be specified multiple times. The flag can also be 
-specified in the format of "name1,name2,name3". The names are matched with the 
+The names of the objects to include in the output can be specified with the
+--names flag. The flag be specified multiple times. The flag can also be
+specified in the format of "name1,name2,name3". The names are matched with the
 Name property of the object.
 
 The device ids or paths of the objects to include in the output can be specified
-with the --devices flag. The flag can be specified multiple times to include 
-multiple device ids or paths. The flag can also be specified in the format of 
-"device1,device2,device3". The device ids or paths are matched with the Path 
+with the --devices flag. The flag can be specified multiple times to include
+multiple device ids or paths. The flag can also be specified in the format of
+"device1,device2,device3". The device ids or paths are matched with the Path
 property of the object. The device ids or paths can be partial matches.
 
-The properties of the objects to include in the output can be specified with 
-the --where flag. The where filter can be used to filter the objects based on 
+The properties of the objects to include in the output can be specified with
+the --where flag. The where filter can be used to filter the objects based on
 the properties of the object. The operators that can be used are "=", ">", "<",
-">=", "<=", "like", and "in". The "like" operator is used to match a substring 
-of the property value using patterns and the '%' as a wildcard. If no operator 
-is used the parameter will try to match the substring of the Name and Path 
+">=", "<=", "like", and "in". The "like" operator is used to match a substring
+of the property value using patterns and the '%' as a wildcard. If no operator
+is used the parameter will try to match the substring of the Name and Path
 properties.
 
 The result table can be sorted with the --sort flag. the fields must be in the
 fields flag. the ordering is ascending by default, descending specific order can
-be specified with ASC or DESC before the fields. 
+be specified with ASC or DESC before the fields.
 `,
 		Aliases: []string{},
 		Args:    cobra.MinimumNArgs(1),
@@ -146,22 +146,26 @@ func newCmdRef() *cobra.Command {
 	cc := &cobra.Command{
 		Use:   "ref <dump file>",
 		Short: "list external references in the dump file",
-		Long: `This command will list all the external references in the dump file. The references
-can be filtered by the type of reference. The output can be written to a file in csv or xlsx format.
+		Long: `This command will list all the external references in the dump file. The
+references can be filtered by the type of reference. The output can be written
+to a file in csv or xlsx format.
 
 If the --all flag is set, all the internal and external references will be listed.
 
-If the --bare flag is set, only the references will be listed to the console. 
+If the --bare flag is set, only the references will be listed to the console.
 
-If the --code, --graphics, or --alarms flags are set, the references will be filtered by the type of reference.
-The flags can be combined to include multiple types of references. If none of the flags are set, then just the 
-code references will be listed.
+If the --code, --graphics, or --alarms flags are set, the references will be
+filtered by the type of reference.The flags can be combined to include multiple
+types of references. If none of the flags are set, then just the code
+references will be listed.
 
 If the --source flag is set, the source path will be included in the output.
 
-The output file can be specified with the --output flag. If the file extension is .csv, then the output will be in csv format.
-If the file extension is .xlsx, then the output will be in xlsx format. If the file extension is not recognized, then the output
-will be written as a text. If the output is not specified then the output is to stout.
+The output file can be specified with the --output flag. If the file extension
+is .csv, then the output will be in csv format. If the file extension is .xlsx, 
+then the output will be in xlsx format. If the file extension is not recognized,
+then the output will be written as a text. If the output is not specified then
+the output is to stout.
 `,
 		Args:    cobra.MinimumNArgs(1),
 		Aliases: []string{"references", "refs"},
