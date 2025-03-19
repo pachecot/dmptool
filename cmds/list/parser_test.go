@@ -219,3 +219,202 @@ func TestParseAndAnd(t *testing.T) {
 		t.Errorf("expected %q items got %q.", expectR, resultR)
 	}
 }
+
+func TestParseList2(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []expression
+	}{
+		{
+			name:     "Empty list",
+			input:    "()",
+			expected: []expression{},
+		},
+		{
+			name:  "Single item list",
+			input: "('A')",
+			expected: []expression{
+				token{kind: k_string, text: "A"},
+			},
+		},
+		{
+			name:  "Multiple items list",
+			input: "('A', 'B', 'C')",
+			expected: []expression{
+				token{kind: k_string, text: "A"},
+				token{kind: k_string, text: "B"},
+				token{kind: k_string, text: "C"},
+			},
+		},
+		{
+			name:  "List with nested expressions",
+			input: "((1 AND 2), 'B', 'C')",
+			expected: []expression{
+				binOp{
+					kind: k_and,
+					lv:   token{kind: k_integer, text: "1"},
+					rv:   token{kind: k_integer, text: "2"},
+				},
+				token{kind: k_string, text: "B"},
+				token{kind: k_string, text: "C"},
+			},
+		},
+		{
+			name:  "List with trailing comma",
+			input: "('A', 'B',)",
+			expected: []expression{
+				token{kind: k_string, text: "A"},
+				token{kind: k_string, text: "B"},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tks := scan(test.input)
+			n, result := parseList(tks)
+			if n != len(tks) {
+				t.Errorf("did not read entire input, read %d of %d.", n, len(tks))
+			}
+			if len(result) != len(test.expected) {
+				t.Errorf("expected %d items, got %d.", len(test.expected), len(result))
+			}
+			for i, exp := range test.expected {
+				if result[i].String() != exp.String() {
+					t.Errorf("expected %q, got %q at index %d.", exp, result[i], i)
+				}
+			}
+		})
+	}
+}
+
+func TestParser(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected expression
+	}{
+		{
+			name:  "Simple equality",
+			input: "X = 'A'",
+			expected: binOp{
+				kind: k_eq,
+				lv:   token{kind: k_field, text: "X"},
+				rv:   token{kind: k_string, text: "A"},
+			},
+		},
+		{
+			name:  "Simple inequality",
+			input: "X != 'A'",
+			expected: binOp{
+				kind: k_ne,
+				lv:   token{kind: k_field, text: "X"},
+				rv:   token{kind: k_string, text: "A"},
+			},
+		},
+		{
+			name:  "Parentheses grouping",
+			input: "(X = 'A')",
+			expected: binOp{
+				kind: k_eq,
+				lv:   token{kind: k_field, text: "X"},
+				rv:   token{kind: k_string, text: "A"},
+			},
+		},
+		{
+			name:  "Logical AND",
+			input: "X = 'A' AND Y = 'B'",
+			expected: binOp{
+				kind: k_and,
+				lv: binOp{
+					kind: k_eq,
+					lv:   token{kind: k_field, text: "X"},
+					rv:   token{kind: k_string, text: "A"},
+				},
+				rv: binOp{
+					kind: k_eq,
+					lv:   token{kind: k_field, text: "Y"},
+					rv:   token{kind: k_string, text: "B"},
+				},
+			},
+		},
+		{
+			name:  "Logical OR",
+			input: "X = 'A' OR Y = 'B'",
+			expected: binOp{
+				kind: k_or,
+				lv: binOp{
+					kind: k_eq,
+					lv:   token{kind: k_field, text: "X"},
+					rv:   token{kind: k_string, text: "A"},
+				},
+				rv: binOp{
+					kind: k_eq,
+					lv:   token{kind: k_field, text: "Y"},
+					rv:   token{kind: k_string, text: "B"},
+				},
+			},
+		},
+		{
+			name:  "IN operator",
+			input: "X IN ('A', 'B', 'C')",
+			expected: inOp{
+				lv: token{kind: k_field, text: "X"},
+				items: []expression{
+					token{kind: k_string, text: "A"},
+					token{kind: k_string, text: "B"},
+					token{kind: k_string, text: "C"},
+				},
+			},
+		},
+		{
+			name:  "BETWEEN operator",
+			input: "X BETWEEN 'A' AND 'B'",
+			expected: betweenOp{
+				kind:  k_between,
+				test:  token{kind: k_field, text: "X"},
+				begin: token{kind: k_string, text: "A"},
+				end:   token{kind: k_string, text: "B"},
+			},
+		},
+		{
+			name:  "LIKE operator",
+			input: "X LIKE 'pattern%'",
+			expected: binOp{
+				kind: k_like,
+				lv:   token{kind: k_field, text: "X"},
+				rv:   token{kind: k_string, text: "pattern%"},
+			},
+		},
+		{
+			name:  "ISNULL operator",
+			input: "X ISNULL",
+			expected: uniOp{
+				kind: k_is_null,
+				rv:   token{kind: k_field, text: "X"},
+			},
+		},
+		{
+			name:  "ISNOTNULL operator",
+			input: "X ISNOTNULL",
+			expected: uniOp{
+				kind: k_is_not_null,
+				rv:   token{kind: k_field, text: "X"},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tks := scan(test.input)
+			n, result := parse(tks)
+			if n != len(tks) {
+				t.Errorf("did not read entire input, read %d of %d.", n, len(tks))
+			}
+			if result.String() != test.expected.String() {
+				t.Errorf("expected %q, got %q.", test.expected, result)
+			}
+		})
+	}
+}

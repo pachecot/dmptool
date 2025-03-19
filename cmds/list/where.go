@@ -11,6 +11,7 @@ import (
 type expression interface {
 	exp()
 	match(*dmp.Object) bool
+	fmt.Stringer
 }
 
 func (e kind) exp() {}

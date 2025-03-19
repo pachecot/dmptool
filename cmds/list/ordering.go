@@ -38,7 +38,7 @@ func (o ordering) compare(a, b []string) int {
 
 	for i := range xs1 {
 		if i >= len(xs2) {
-			return -sign
+			return sign
 		}
 		if xs1[i] == xs2[i] {
 			continue

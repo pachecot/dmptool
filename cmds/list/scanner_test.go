@@ -109,3 +109,42 @@ func TestScanNumbers(t *testing.T) {
 		})
 	}
 }
+
+func TestReadNumber(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected token
+	}{
+		{"Integer", "123", token{kind: k_integer, text: "123"}},
+		{"Negative Integer", "-123", token{kind: k_integer, text: "-123"}},
+		{"Positive Integer", "+123", token{kind: k_integer, text: "+123"}},
+		{"Decimal", "123.45", token{kind: k_decimal, text: "123.45"}},
+		{"Negative Decimal", "-123.45", token{kind: k_decimal, text: "-123.45"}},
+		{"Positive Decimal", "+123.45", token{kind: k_decimal, text: "+123.45"}},
+		{"Exponential", "1e10", token{kind: k_decimal, text: "1e10"}},
+		{"Negative Exponential", "-1e10", token{kind: k_decimal, text: "-1e10"}},
+		{"Positive Exponential", "+1e10", token{kind: k_decimal, text: "+1e10"}},
+		{"Decimal with Exponential", "1.23e10", token{kind: k_decimal, text: "1.23e10"}},
+		{"Negative Decimal with Exponential", "-1.23e10", token{kind: k_decimal, text: "-1.23e10"}},
+		{"Positive Decimal with Exponential", "+1.23e10", token{kind: k_decimal, text: "+1.23e10"}},
+		{"Invalid Number", "123abc", token{kind: k_field, text: "123abc"}},
+		{"Number with Operator", "123+456", token{kind: k_integer, text: "123"}},
+		{"Number with Space", "123 456", token{kind: k_integer, text: "123"}},
+		{"Number with Symbol", "123,456", token{kind: k_integer, text: "123"}},
+		{"Parse Error", "123@", token{kind: k_field, text: "123@"}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data := []byte(test.input)
+			_, tk := readNumber(data)
+			if tk.kind != test.expected.kind {
+				t.Errorf("Expected kind %v, got %v", test.expected.kind, tk.kind)
+			}
+			if tk.text != test.expected.text {
+				t.Errorf("Expected text %v, got %v", test.expected.text, tk.text)
+			}
+		})
+	}
+}

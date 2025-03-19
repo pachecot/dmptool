@@ -306,9 +306,10 @@ func readNumber(data []byte) (int, token) {
 	if data[p] == '-' || data[p] == '+' {
 		p++
 	}
-	p, tk := readDigits(data[p:])
+	n, _ := readDigits(data[p:])
+	p += n
 	if p == len(data) || isSpace(data[p]) {
-		return p, tk
+		return p, token{kind: k, text: string(data[:p])}
 	}
 	// decimal float number
 	if p < len(data) && data[p] == '.' {
