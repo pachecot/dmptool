@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/tpacheco/dmptool/internal/terminal"
+	"github.com/pachecot/dmptool/internal/terminal"
 )
 
 type command int

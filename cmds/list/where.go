@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tpacheco/dmptool/dmp"
+	"github.com/pachecot/dmptool/dmp"
 )
 
 type expression interface {

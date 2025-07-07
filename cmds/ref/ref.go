@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/tpacheco/dmptool/dmp"
+	"github.com/pachecot/dmptool/dmp"
 	"github.com/xuri/excelize/v2"
 	"golang.org/x/exp/maps"
 )

@@ -1,4 +1,4 @@
-module github.com/tpacheco/dmptool
+module github.com/pachecot/dmptool
 
 go 1.23.0
 

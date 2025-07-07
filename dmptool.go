@@ -5,11 +5,11 @@ import (
 
 	_ "embed"
 
+	"github.com/pachecot/dmptool/cmds/list"
+	"github.com/pachecot/dmptool/cmds/pe"
+	"github.com/pachecot/dmptool/cmds/ref"
+	"github.com/pachecot/dmptool/cmds/tree"
 	"github.com/spf13/cobra"
-	"github.com/tpacheco/dmptool/cmds/list"
-	"github.com/tpacheco/dmptool/cmds/pe"
-	"github.com/tpacheco/dmptool/cmds/ref"
-	"github.com/tpacheco/dmptool/cmds/tree"
 )
 
 var (
