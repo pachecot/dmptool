@@ -8,6 +8,7 @@ import (
 	"github.com/pachecot/dmptool/cmds/list"
 	"github.com/pachecot/dmptool/cmds/pe"
 	"github.com/pachecot/dmptool/cmds/ref"
+	"github.com/pachecot/dmptool/cmds/report"
 	"github.com/pachecot/dmptool/cmds/tree"
 	"github.com/spf13/cobra"
 )
@@ -232,6 +233,7 @@ func main() {
 		newCmdRef(),
 		newCmdTree(),
 		newCmdList(),
+		report.NewCmdReport(),
 		newCmdVersion(),
 	)
 	cc.Execute()
