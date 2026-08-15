@@ -35,15 +35,11 @@ func (h *listHandler) Object(do *dmp.Object) {
 		return
 	}
 
-	if len(h.names) > 0 && !slices.ContainsFunc(h.names, func(f string) bool {
-		return strings.Contains(do.Name, f)
-	}) {
+	if !do.MatchesNames(h.names) {
 		return
 	}
 
-	if len(h.devices) > 0 && !slices.ContainsFunc(h.devices, func(f string) bool {
-		return strings.Contains(do.Path, f)
-	}) {
+	if !do.MatchesDevices(h.devices) {
 		return
 	}
 

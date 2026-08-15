@@ -1,6 +1,8 @@
 package dmp
 
 import (
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -73,6 +75,22 @@ type AlarmLink struct {
 	Id      int
 	Path    string
 	Enabled bool
+}
+
+// MatchesDevices reports whether the object's path contains any of the given device strings.
+// Returns true when devices is empty (no filter applied).
+func (o *Object) MatchesDevices(devices []string) bool {
+	return len(devices) == 0 || slices.ContainsFunc(devices, func(d string) bool {
+		return strings.Contains(o.Path, d)
+	})
+}
+
+// MatchesNames reports whether the object's name contains any of the given name strings.
+// Returns true when names is empty (no filter applied).
+func (o *Object) MatchesNames(names []string) bool {
+	return len(names) == 0 || slices.ContainsFunc(names, func(n string) bool {
+		return strings.Contains(o.Name, n)
+	})
 }
 
 func ObjectPathCompare(a, b *Object) int {
