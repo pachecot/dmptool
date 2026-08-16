@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs wc *)",
+      "Bash(sed 's/:.*$//')",
+      "Bash(sed 's/^[[:space:]]*//g')",
+      "Bash(cat)",
+      "Bash(bash /tmp/analyze_dmp.sh)",
+      "Bash(grep -rml \"InfinityInput\" \"c:/projects/github.com/pachecot/dmptool/Sample Files/\")",
+      "Bash(go build *)",
+      "Bash(go run *)",
+      "WebSearch",
+      "WebFetch(domain:cdn.thefirepanel.com)",
+      "WebFetch(domain:plcproducts.com)"
+    ]
+  }
+}
