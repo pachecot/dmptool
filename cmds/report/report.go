@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -115,6 +116,24 @@ func writeCSV(fileName string, headers []string, table [][]string) {
 	csvW.Flush()
 }
 
+func toXLSXRow(row []string) []interface{} {
+	cells := make([]interface{}, len(row))
+	for i, s := range row {
+		if s != "" && s[0] >= '0' && s[0] <= '9' {
+			if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+				cells[i] = n
+			} else if n, err := strconv.ParseFloat(s, 64); err == nil {
+				cells[i] = n
+			} else {
+				cells[i] = s
+			}
+		} else {
+			cells[i] = s
+		}
+	}
+	return cells
+}
+
 func writeXLSX(fName string, headers []string, table [][]string) {
 	ws := colWidths(headers, table)
 
@@ -131,7 +150,8 @@ func writeXLSX(fName string, headers []string, table [][]string) {
 
 	f.SetSheetRow("Sheet1", "A1", &headers)
 	for i, row := range table {
-		f.SetSheetRow("Sheet1", fmt.Sprintf("%c%d", 'A', i+2), &row)
+		xlsxRow := toXLSXRow(row)
+		f.SetSheetRow("Sheet1", fmt.Sprintf("%c%d", 'A', i+2), &xlsxRow)
 	}
 
 	if err := f.SaveAs(fName); err != nil {
