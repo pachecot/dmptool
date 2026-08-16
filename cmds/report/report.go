@@ -30,6 +30,7 @@ Available subcommands:
   alarms            - Points that have alarm links, expanded one row per alarm
   logs              - Points that have logging configured
   alarm-enrollments - AlarmEnrollment objects with parsed event parameters
+  event-enrollments - EventEnrollment objects with parsed event parameters and object property reference
 `,
 		Args: cobra.MinimumNArgs(2),
 	}
@@ -39,6 +40,7 @@ Available subcommands:
 		NewCmdAlarms(),
 		NewCmdLogs(),
 		NewCmdAlarmEnrollments(),
+		NewCmdEventEnrollments(),
 	)
 	return cc
 }

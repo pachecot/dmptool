@@ -169,6 +169,7 @@ Generates structured reports from a dump file. Each subcommand produces a fixed-
         alarms            : Points with alarms, expanded one row per alarm link
         logs              : Points with logging configured
         alarm-enrollments : AlarmEnrollment objects with parsed event parameters
+        event-enrollments : EventEnrollment objects with parsed event parameters and object property reference
 
 ---
 
@@ -295,6 +296,41 @@ Reports all AlarmEnrollment objects with their event parameters parsed from the 
 ```
         -d, --devices strings               filter by device path
         -h, --help                         help for alarm-enrollments
+        -n, --names strings                 filter by point name
+        -o, --output string               output file (csv, xlsx, or text)
+```
+
+---
+
+### report event-enrollments
+
+`> dmptool report event-enrollments <dump file> [flags]`
+
+Reports all EventEnrollment objects with their event parameters parsed from the EventParameters CDT block and the monitored point extracted from the ObjPropRef block. Handles ChangeOfState, ChangeOfValue, and OutOfRange event types.
+
+#### Aliases:
+
+        ee
+
+#### Columns:
+
+        Name, Alias, Description, EventType,
+        TimeDelay, ObjPropRef, StateValues, COVIncrement, LowLimit, HighLimit, Deadband,
+        EventNotificationId, MsgTextOffNormal, MsgTextNormal
+
+| Column | Populated for |
+|---|---|
+| TimeDelay | all event types |
+| ObjPropRef | all event types — the monitored point path |
+| StateValues | ChangeOfState — comma-separated triggering state values |
+| COVIncrement | ChangeOfValue — the COV increment threshold |
+| LowLimit / HighLimit / Deadband | OutOfRange |
+
+#### Option Flags:
+
+```
+        -d, --devices strings               filter by device path
+        -h, --help                         help for event-enrollments
         -n, --names strings                 filter by point name
         -o, --output string               output file (csv, xlsx, or text)
 ```
