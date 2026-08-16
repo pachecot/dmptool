@@ -1,6 +1,9 @@
 package report
 
 import (
+	"slices"
+	"strings"
+
 	"github.com/pachecot/dmptool/dmp"
 	"github.com/spf13/cobra"
 )
@@ -40,6 +43,13 @@ func (cmd *logsCommand) Execute() {
 		names:   cmd.Names,
 	}
 	dmp.ParseFile(cmd.FileName, h)
+
+	slices.SortFunc(h.results, func(a, b *dmp.Object) int {
+		if n := strings.Compare(a.DeviceId, b.DeviceId); n != 0 {
+			return n
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	table := make([][]string, 0, len(h.results))
 	for _, obj := range h.results {

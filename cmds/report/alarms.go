@@ -1,7 +1,9 @@
 package report
 
 import (
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/pachecot/dmptool/dmp"
 	"github.com/spf13/cobra"
@@ -46,9 +48,19 @@ func (cmd *alarmsCommand) Execute() {
 	}
 	dmp.ParseFile(cmd.FileName, h)
 
+	slices.SortFunc(h.results, func(a, b *dmp.Object) int {
+		if n := strings.Compare(a.DeviceId, b.DeviceId); n != 0 {
+			return n
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+
 	table := make([][]string, 0, len(h.results))
 	for _, obj := range h.results {
 		links := dmp.ParseAlarmLinks(obj.Properties["AlarmLinks"])
+		slices.SortFunc(links, func(a, b *dmp.AlarmLink) int {
+			return strings.Compare(a.Path, b.Path)
+		})
 		for _, link := range links {
 			if link == nil {
 				continue
