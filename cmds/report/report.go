@@ -25,10 +25,11 @@ func NewCmdReport() *cobra.Command {
 		Long: `Generate structured reports from a Continuum dump file.
 
 Available subcommands:
-  io      - IO points (InfinityInput and InfinityOutput) with electrical and engineering scale info
-  points  - Point summary (String, Numeric, Input, Output, DateTime) with value and setpoint
-  alarms  - Points that have alarm links, expanded one row per alarm
-  logs    - Points that have logging configured
+  io                - IO points (InfinityInput and InfinityOutput) with electrical and engineering scale info
+  points            - Point summary (String, Numeric, Input, Output, DateTime) with value and setpoint
+  alarms            - Points that have alarm links, expanded one row per alarm
+  logs              - Points that have logging configured
+  alarm-enrollments - AlarmEnrollment objects with parsed event parameters
 `,
 		Args: cobra.MinimumNArgs(2),
 	}
@@ -37,6 +38,7 @@ Available subcommands:
 		NewCmdPoints(),
 		NewCmdAlarms(),
 		NewCmdLogs(),
+		NewCmdAlarmEnrollments(),
 	)
 	return cc
 }

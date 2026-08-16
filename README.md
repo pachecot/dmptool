@@ -164,10 +164,11 @@ Generates structured reports from a dump file. Each subcommand produces a fixed-
 
 ### Subcommands
 
-        io         : IO points with electrical and engineering scale configuration
-        points     : Point summary (String, Numeric, Input, Output, DateTime)
-        alarms     : Points with alarms, expanded one row per alarm link
-        logs       : Points with logging configured
+        io                : IO points with electrical and engineering scale configuration
+        points            : Point summary (String, Numeric, Input, Output, DateTime)
+        alarms            : Points with alarms, expanded one row per alarm link
+        logs              : Points with logging configured
+        alarm-enrollments : AlarmEnrollment objects with parsed event parameters
 
 ---
 
@@ -267,6 +268,33 @@ Reports all points that have logging configured.
 ```
         -d, --devices strings               filter by device path
         -h, --help                         help for logs
+        -n, --names strings                 filter by point name
+        -o, --output string               output file (csv, xlsx, or text)
+```
+
+---
+
+### report alarm-enrollments
+
+`> dmptool report alarm-enrollments <dump file> [flags]`
+
+Reports all AlarmEnrollment objects with their event parameters parsed from the EventParameters CDT block. Supports both ACCExpression (type 340) and HiLimit/LoLimit (type 337) event types.
+
+#### Aliases:
+
+        ae, enrollments
+
+#### Columns:
+
+        Name, Alias, Description, EventType,
+        TimeDelay, ACCExpression, Limit, Normal,
+        EventNotificationId, MsgTextOffNormal, MsgTextNormal
+
+#### Option Flags:
+
+```
+        -d, --devices strings               filter by device path
+        -h, --help                         help for alarm-enrollments
         -n, --names strings                 filter by point name
         -o, --output string               output file (csv, xlsx, or text)
 ```
