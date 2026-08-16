@@ -170,6 +170,7 @@ Generates structured reports from a dump file. Each subcommand produces a fixed-
         logs              : Points with logging configured
         alarm-enrollments : AlarmEnrollment objects with parsed event parameters
         event-enrollments : EventEnrollment objects with parsed event parameters and object property reference
+        schedules         : Schedule objects with weekly and exception time-value entries
 
 ---
 
@@ -332,5 +333,39 @@ Reports all EventEnrollment objects with their event parameters parsed from the 
         -d, --devices strings               filter by device path
         -h, --help                         help for event-enrollments
         -n, --names strings                 filter by point name
+        -o, --output string               output file (csv, xlsx, or text)
+```
+
+---
+
+### report schedules
+
+`> dmptool report schedules <dump file> [flags]`
+
+Reports all Schedule objects with their weekly program and date-specific exception overrides. Each time-value entry is expanded as an individual row. Exception rows with an empty time indicate a fully unoccupied override (no active periods).
+
+#### Aliases:
+
+        sched, schedule
+
+#### Columns:
+
+        Name, Device, Kind, Day/Date, Time, Value, ValueType, Priority
+
+| Column | Description |
+|---|---|
+| Kind | `Weekly` for normal day-of-week entries; `Exception` for date overrides |
+| Day/Date | Day name (Monday–Sunday) for weekly rows; date or date range for exceptions |
+| Time | Scheduled time (e.g. `6:30:00 AM`) |
+| Value | The scheduled value (e.g. `1` for occupied, `0` for unoccupied) |
+| ValueType | BACnet value type number (e.g. `2` for Binary) |
+| Priority | Exception priority level (exceptions only) |
+
+#### Option Flags:
+
+```
+        -d, --devices strings               filter by device path
+        -h, --help                         help for schedules
+        -n, --names strings                 filter by schedule name
         -o, --output string               output file (csv, xlsx, or text)
 ```

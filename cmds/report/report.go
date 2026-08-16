@@ -31,6 +31,7 @@ Available subcommands:
   logs              - Points that have logging configured
   alarm-enrollments - AlarmEnrollment objects with parsed event parameters
   event-enrollments - EventEnrollment objects with parsed event parameters and object property reference
+  schedules         - Schedule objects with weekly and exception time-value entries
 `,
 		Args: cobra.MinimumNArgs(2),
 	}
@@ -41,6 +42,7 @@ Available subcommands:
 		NewCmdLogs(),
 		NewCmdAlarmEnrollments(),
 		NewCmdEventEnrollments(),
+		NewCmdSchedules(),
 	)
 	return cc
 }
