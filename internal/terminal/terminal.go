@@ -6,10 +6,11 @@ import (
 )
 
 type Terminal struct {
-	in     uintptr
-	out    uintptr
-	isOpen bool
-	closer func()
+	in       uintptr
+	out      uintptr
+	isOpen   bool
+	closer   func()
+	rawState any // *term.State on darwin; unused on windows
 }
 
 type Listener struct {

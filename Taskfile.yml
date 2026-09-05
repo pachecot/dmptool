@@ -5,17 +5,54 @@ vars:
 
   LDFLAGS: -ldflags "-X 'main.Date={{.DATE}}'"
 
+  DIST_DIR: dist
+
+  # internal/terminal only has windows and darwin implementations, so
+  # those are the only GOOS/GOARCH combinations that can build dmptool.
+  PLATFORMS:
+    - windows/amd64
+    - windows/arm64
+    - darwin/amd64
+    - darwin/arm64
+
 tasks:
 
-  default: 
-    cmds:    
+  default:
+    cmds:
       - task: dmptool
 
   dmptool:
     deps: [test]
-    cmds:    
+    cmds:
       - go build {{.LDFLAGS}} -v .
 
   test:
     cmds:
       - go test ./...
+
+  clean:
+    cmds:
+      - rm -rf {{.DIST_DIR}}
+
+  build-all:
+    desc: cross-compile release binaries for every supported platform into {{.DIST_DIR}}
+    deps: [test]
+    cmds:
+      - for: { var: PLATFORMS }
+        task: build-platform
+        vars:
+          PLATFORM: '{{.ITEM}}'
+
+  build-platform:
+    internal: true
+    vars:
+      GOOS: '{{splitList "/" .PLATFORM | first}}'
+      GOARCH: '{{splitList "/" .PLATFORM | last}}'
+      EXT: '{{if eq .GOOS "windows"}}.exe{{end}}'
+    env:
+      GOOS: '{{.GOOS}}'
+      GOARCH: '{{.GOARCH}}'
+      CGO_ENABLED: '0'
+    cmds:
+      - mkdir -p {{.DIST_DIR}}
+      - go build {{.LDFLAGS}} -o {{.DIST_DIR}}/dmptool-{{.GOOS}}-{{.GOARCH}}{{.EXT}} .
