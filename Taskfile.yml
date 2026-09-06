@@ -9,7 +9,7 @@ vars:
 
       # Automatically fetches the latest Git tag or short commit hash
   VERSION: 
-        sh: git describe --tags --always || echo "dev"
+      sh: git describe --tags --always || echo "dev"
 
   # internal/terminal only has windows and darwin implementations, so
   # those are the only GOOS/GOARCH combinations that can build dmptool.
@@ -30,6 +30,12 @@ tasks:
     cmds:
       - go build {{.LDFLAGS}} -v .
 
+  setup:
+    vars:
+      TASK_SHELL: sh
+    cmds:
+      - mkdir -p {{.DIST_DIR}}
+
   test:
     cmds:
       - go test ./...
@@ -40,7 +46,7 @@ tasks:
 
   build-all:
     desc: cross-compile release binaries for every supported platform into {{.DIST_DIR}}
-    deps: [test]
+    deps: [test, setup]
     cmds:
       - for: { var: PLATFORMS }
         task: build-platform
@@ -58,5 +64,4 @@ tasks:
       GOARCH: '{{.GOARCH}}'
       CGO_ENABLED: '0'
     cmds:
-      - mkdir -p {{.DIST_DIR}}
       - go build {{.LDFLAGS}} -o {{.DIST_DIR}}/dmptool-{{.VERSION}}-{{.GOOS}}-{{.GOARCH}}{{.EXT}} .
