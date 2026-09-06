@@ -5,3 +5,5 @@ Text File Dumps
 .task
 *.zip
 *.rar
+dist/
+dmptool
