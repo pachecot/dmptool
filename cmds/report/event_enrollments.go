@@ -1,6 +1,9 @@
 package report
 
 import (
+	"fmt"
+	"io"
+	"os"
 	"sort"
 
 	"github.com/pachecot/dmptool/dmp"
@@ -41,11 +44,21 @@ type eventEnrollmentsCommand struct {
 }
 
 func (cmd *eventEnrollmentsCommand) Execute() {
-	h := &eventEnrollmentsHandler{
-		devices: cmd.Devices,
-		names:   cmd.Names,
+	r, err := os.Open(cmd.FileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening file %s, %v", cmd.FileName, err)
+		return
 	}
-	dmp.ParseFile(cmd.FileName, h)
+	table := eeoReport(r, cmd.Devices, cmd.Names)
+	outputTable(cmd.OutFile, "Event Enrollment Report", eventEnrollmentHeaders, table)
+}
+
+func eeoReport(r io.Reader, devices, names []string) [][]string {
+	h := &eventEnrollmentsHandler{
+		devices: devices,
+		names:   names,
+	}
+	dmp.Parse(r, h)
 	sort.Slice(h.results, func(i, j int) bool {
 		return h.results[i].Name < h.results[j].Name
 	})
@@ -71,7 +84,7 @@ func (cmd *eventEnrollmentsCommand) Execute() {
 		})
 	}
 
-	outputTable(cmd.OutFile, eventEnrollmentHeaders, table)
+	return table
 }
 
 func NewCmdEventEnrollments() *cobra.Command {

@@ -1,6 +1,9 @@
 package report
 
 import (
+	"fmt"
+	"io"
+	"os"
 	"slices"
 	"strings"
 
@@ -52,12 +55,23 @@ type pointsCommand struct {
 }
 
 func (cmd *pointsCommand) Execute() {
-	h := &pointsHandler{
-		types:   cmd.Types,
-		devices: cmd.Devices,
-		names:   cmd.Names,
+	r, err := os.Open(cmd.FileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening file %s, %v", cmd.FileName, err)
+		return
 	}
-	dmp.ParseFile(cmd.FileName, h)
+	table := pointsReport(r, cmd.Types, cmd.Devices, cmd.Names)
+	outputTable(cmd.OutFile, "Points report", pointHeaders, table)
+
+}
+
+func pointsReport(r io.Reader, types, devices, names []string) [][]string {
+	h := &pointsHandler{
+		types:   types,
+		devices: devices,
+		names:   names,
+	}
+	dmp.Parse(r, h)
 
 	slices.SortFunc(h.results, func(a, b *dmp.Object) int {
 		if n := strings.Compare(a.DeviceId, b.DeviceId); n != 0 {
@@ -86,7 +100,7 @@ func (cmd *pointsCommand) Execute() {
 		table = append(table, row)
 	}
 
-	outputTable(cmd.OutFile, pointHeaders, table)
+	return table
 }
 
 func NewCmdPoints() *cobra.Command {

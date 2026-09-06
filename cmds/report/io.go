@@ -1,6 +1,9 @@
 package report
 
 import (
+	"fmt"
+	"io"
+	"os"
 	"slices"
 	"strings"
 
@@ -43,11 +46,21 @@ type ioCommand struct {
 }
 
 func (cmd *ioCommand) Execute() {
-	h := &ioHandler{
-		devices: cmd.Devices,
-		names:   cmd.Names,
+	r, err := os.Open(cmd.FileName)
+	if err != nil {
+		fmt.Printf("error opening file")
+		return
 	}
-	dmp.ParseFile(cmd.FileName, h)
+	table := ioReport(r, cmd.Devices, cmd.Names)
+	outputTable(cmd.OutFile, "IO Report", ioHeaders, table)
+}
+
+func ioReport(r io.Reader, devices, names []string) [][]string {
+	h := &ioHandler{
+		devices: devices,
+		names:   names,
+	}
+	dmp.Parse(r, h)
 
 	slices.SortFunc(h.results, func(a, b *dmp.Object) int {
 		if n := strings.Compare(a.DeviceId, b.DeviceId); n != 0 {
@@ -81,8 +94,7 @@ func (cmd *ioCommand) Execute() {
 		}
 		table = append(table, row)
 	}
-
-	outputTable(cmd.OutFile, ioHeaders, table)
+	return table
 }
 
 func NewCmdIO() *cobra.Command {

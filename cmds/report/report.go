@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -19,9 +20,16 @@ const (
 	xlsxExt = ".xlsx"
 )
 
+type reportCmd struct {
+	FileName string
+	outfile  string
+}
+
 func NewCmdReport() *cobra.Command {
+
+	cmd := &reportCmd{}
 	cc := &cobra.Command{
-		Use:   "report <subcommand> <dump file>",
+		Use:   "report [subcommand] <dump file>",
 		Short: "generate structured reports from a dump file",
 		Long: `Generate structured reports from a Continuum dump file.
 
@@ -34,7 +42,11 @@ Available subcommands:
   event-enrollments - EventEnrollment objects with parsed event parameters and object property reference
   schedules         - Schedule objects with weekly and exception time-value entries
 `,
-		Args: cobra.MinimumNArgs(2),
+		Args: cobra.MinimumNArgs(1),
+		Run: func(c *cobra.Command, args []string) {
+			cmd.FileName = args[0]
+			cmd.Execute()
+		},
 	}
 	cc.AddCommand(
 		NewCmdIO(),
@@ -45,7 +57,74 @@ Available subcommands:
 		NewCmdEventEnrollments(),
 		NewCmdSchedules(),
 	)
+	cc.Flags().StringVarP(&cmd.outfile, "output", "o", "", "output file name (xlsx)")
+
 	return cc
+}
+
+func (cmd *reportCmd) Execute() {
+	r, err := os.Open(cmd.FileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to open file %s, error: %v", cmd.FileName, err)
+		return
+	}
+
+	f := excelize.NewFile()
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	r.Seek(0, 0)
+	table := ioReport(r, nil, nil)
+	if len(table) > 0 {
+		writeXLSXSheet(f, "IO Points", ioHeaders, table)
+	}
+
+	r.Seek(0, 0)
+	table = pointsReport(r, nil, nil, nil)
+	if len(table) > 0 {
+		writeXLSXSheet(f, "Points", pointHeaders, table)
+	}
+
+	r.Seek(0, 0)
+	table = alarmReport(r, nil, nil)
+	if len(table) > 0 {
+		writeXLSXSheet(f, "Alarms", alarmHeaders, table)
+	}
+
+	r.Seek(0, 0)
+	table = alarmEnrollmentsReport(r, nil, nil)
+	if len(table) > 0 {
+		writeXLSXSheet(f, "Alarm Enrollemnts", alarmEnrollmentHeaders, table)
+	}
+
+	r.Seek(0, 0)
+	table = eeoReport(r, nil, nil)
+	if len(table) > 0 {
+		writeXLSXSheet(f, "Event Enrollemnts", eventEnrollmentHeaders, table)
+	}
+
+	r.Seek(0, 0)
+	table = schedulesReport(r, nil, nil)
+	if len(table) > 0 {
+		writeXLSXSheet(f, "Schedules", scheduleHeaders, table)
+	}
+
+	r.Seek(0, 0)
+	table = eeoReport(r, nil, nil)
+	if len(table) > 0 {
+		writeXLSXSheet(f, "Event Enrollemnts", ioHeaders, table)
+	}
+
+	if cmd.outfile == "" {
+		cmd.outfile = strings.TrimSuffix(cmd.FileName, filepath.Ext(cmd.FileName)) + xlsxExt
+	}
+
+	if err := f.SaveAs(cmd.outfile); err != nil {
+		fmt.Println(err)
+	}
 }
 
 func colWidths(headers []string, table [][]string) []int {
@@ -134,8 +213,7 @@ func toXLSXRow(row []string) []interface{} {
 	return cells
 }
 
-func writeXLSX(fName string, headers []string, table [][]string) {
-	ws := colWidths(headers, table)
+func writeXLSX(fName string, sName string, headers []string, table [][]string) {
 
 	f := excelize.NewFile()
 	defer func() {
@@ -144,25 +222,36 @@ func writeXLSX(fName string, headers []string, table [][]string) {
 		}
 	}()
 
-	for i, width := range ws {
-		f.SetColWidth("Sheet1", fmt.Sprintf("%c", 'A'+i), fmt.Sprintf("%c", 'A'+i), float64(width))
-	}
-
-	f.SetSheetRow("Sheet1", "A1", &headers)
-	for i, row := range table {
-		xlsxRow := toXLSXRow(row)
-		f.SetSheetRow("Sheet1", fmt.Sprintf("%c%d", 'A', i+2), &xlsxRow)
-	}
+	writeXLSXSheet(f, sName, headers, table)
 
 	if err := f.SaveAs(fName); err != nil {
 		fmt.Println(err)
 	}
 }
 
-func outputTable(outFile string, headers []string, table [][]string) {
+func writeXLSXSheet(f *excelize.File, sName string, headers []string, table [][]string) {
+
+	ws := colWidths(headers, table)
+
+	if id, _ := f.GetSheetIndex(sName); id == -1 {
+		f.NewSheet(sName)
+	}
+
+	for i, width := range ws {
+		f.SetColWidth(sName, fmt.Sprintf("%c", 'A'+i), fmt.Sprintf("%c", 'A'+i), float64(width))
+	}
+
+	f.SetSheetRow(sName, "A1", &headers)
+	for i, row := range table {
+		xlsxRow := toXLSXRow(row)
+		f.SetSheetRow(sName, fmt.Sprintf("%c%d", 'A', i+2), &xlsxRow)
+	}
+}
+
+func outputTable(outFile string, name string, headers []string, table [][]string) {
 	switch strings.ToLower(path.Ext(outFile)) {
 	case xlsxExt:
-		writeXLSX(outFile, headers, table)
+		writeXLSX(outFile, name, headers, table)
 	case csvExt:
 		writeCSV(outFile, headers, table)
 	default:

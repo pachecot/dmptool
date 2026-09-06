@@ -1,6 +1,9 @@
 package report
 
 import (
+	"fmt"
+	"io"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -42,11 +45,22 @@ type alarmsCommand struct {
 }
 
 func (cmd *alarmsCommand) Execute() {
-	h := &alarmsHandler{
-		devices: cmd.Devices,
-		names:   cmd.Names,
+	r, err := os.Open(cmd.FileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening file %s, %v", cmd.FileName, err)
+		return
 	}
-	dmp.ParseFile(cmd.FileName, h)
+	table := alarmReport(r, cmd.Devices, cmd.Names)
+
+	outputTable(cmd.OutFile, "Alarm Report", alarmHeaders, table)
+}
+
+func alarmReport(r io.Reader, devices, names []string) [][]string {
+	h := &alarmsHandler{
+		devices: devices,
+		names:   names,
+	}
+	dmp.Parse(r, h)
 
 	slices.SortFunc(h.results, func(a, b *dmp.Object) int {
 		if n := strings.Compare(a.DeviceId, b.DeviceId); n != 0 {
@@ -80,7 +94,7 @@ func (cmd *alarmsCommand) Execute() {
 		}
 	}
 
-	outputTable(cmd.OutFile, alarmHeaders, table)
+	return table
 }
 
 func NewCmdAlarms() *cobra.Command {

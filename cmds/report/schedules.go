@@ -2,6 +2,8 @@ package report
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"sort"
 	"strings"
 
@@ -43,11 +45,21 @@ type schedulesCommand struct {
 }
 
 func (cmd *schedulesCommand) Execute() {
-	h := &schedulesHandler{
-		devices: cmd.Devices,
-		names:   cmd.Names,
+	r, err := os.Open(cmd.FileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening file %s, %v", cmd.FileName, err)
+		return
 	}
-	dmp.ParseFile(cmd.FileName, h)
+	table := schedulesReport(r, cmd.Devices, cmd.Names)
+	outputTable(cmd.OutFile, "Alarm Enrollments Report", scheduleHeaders, table)
+}
+
+func schedulesReport(r io.Reader, devices, names []string) [][]string {
+	h := &schedulesHandler{
+		devices: devices,
+		names:   names,
+	}
+	dmp.Parse(r, h)
 
 	var rows []scheduleRow
 	for _, obj := range h.results {
@@ -76,7 +88,7 @@ func (cmd *schedulesCommand) Execute() {
 	for i, r := range rows {
 		table[i] = r.cols
 	}
-	outputTable(cmd.OutFile, scheduleHeaders, table)
+	return table
 }
 
 func exceptionPeriodLabel(p dmp.ExceptionPeriod) string {

@@ -1,6 +1,9 @@
 package report
 
 import (
+	"fmt"
+	"io"
+	"os"
 	"sort"
 
 	"github.com/pachecot/dmptool/dmp"
@@ -41,11 +44,21 @@ type alarmEnrollmentsCommand struct {
 }
 
 func (cmd *alarmEnrollmentsCommand) Execute() {
-	h := &alarmEnrollmentsHandler{
-		devices: cmd.Devices,
-		names:   cmd.Names,
+	r, err := os.Open(cmd.FileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening file %s, %v", cmd.FileName, err)
+		return
 	}
-	dmp.ParseFile(cmd.FileName, h)
+	table := alarmEnrollmentsReport(r, cmd.Devices, cmd.Names)
+	outputTable(cmd.OutFile, "Alarm Enrollments Report", alarmEnrollmentHeaders, table)
+}
+
+func alarmEnrollmentsReport(r io.Reader, devices, names []string) [][]string {
+	h := &alarmEnrollmentsHandler{
+		devices: devices,
+		names:   names,
+	}
+	dmp.Parse(r, h)
 	sort.Slice(h.results, func(i, j int) bool {
 		return h.results[i].Name < h.results[j].Name
 	})
@@ -68,7 +81,7 @@ func (cmd *alarmEnrollmentsCommand) Execute() {
 		})
 	}
 
-	outputTable(cmd.OutFile, alarmEnrollmentHeaders, table)
+	return table
 }
 
 func NewCmdAlarmEnrollments() *cobra.Command {

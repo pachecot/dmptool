@@ -1,6 +1,9 @@
 package report
 
 import (
+	"fmt"
+	"io"
+	"os"
 	"slices"
 	"strings"
 
@@ -38,11 +41,22 @@ type logsCommand struct {
 }
 
 func (cmd *logsCommand) Execute() {
-	h := &logsHandler{
-		devices: cmd.Devices,
-		names:   cmd.Names,
+
+	r, err := os.Open(cmd.FileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening file %s, %v", cmd.FileName, err)
+		return
 	}
-	dmp.ParseFile(cmd.FileName, h)
+	table := logsReport(r, cmd.Devices, cmd.Names)
+	outputTable(cmd.OutFile, "Log report", logHeaders, table)
+}
+
+func logsReport(r io.Reader, devices, names []string) [][]string {
+	h := &logsHandler{
+		devices: devices,
+		names:   names,
+	}
+	dmp.Parse(r, h)
 
 	slices.SortFunc(h.results, func(a, b *dmp.Object) int {
 		if n := strings.Compare(a.DeviceId, b.DeviceId); n != 0 {
@@ -66,8 +80,7 @@ func (cmd *logsCommand) Execute() {
 		}
 		table = append(table, row)
 	}
-
-	outputTable(cmd.OutFile, logHeaders, table)
+	return table
 }
 
 func NewCmdLogs() *cobra.Command {
