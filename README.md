@@ -158,9 +158,11 @@ Display dump file as a tree.
 
 ## report command
 
-`> dmptool report <subcommand> <dump file> [flags]`
+`> dmptool report [subcommand] <dump file> [flags]`
 
 Generates structured reports from a dump file. Each subcommand produces a fixed-column report for a specific object category. Output can be written to the console or to a file (csv or xlsx).
+
+Running report without a sub command will output a xlsx file with the results of all the sub commands. Each subcommand will output on a different sheet. If the output file is not provided the source file name will be used with the .xlsx extension. 
 
 ### Subcommands
 
@@ -171,6 +173,7 @@ Generates structured reports from a dump file. Each subcommand produces a fixed-
         alarm-enrollments : AlarmEnrollment objects with parsed event parameters
         event-enrollments : EventEnrollment objects with parsed event parameters and object property reference
         schedules         : Schedule objects with weekly and exception time-value entries
+
 
 ---
 
