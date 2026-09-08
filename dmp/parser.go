@@ -549,7 +549,7 @@ func Parse(r io.Reader, h Handler) string {
 
 func ParseAlarmLinks(s string) []*AlarmLink {
 
-	alarms := make([]*AlarmLink, 0)
+	alarms := make([]*AlarmLink, 0, 8)
 	scanner := bufio.NewScanner(strings.NewReader(s))
 	for scanner.Scan() {
 		fields := strings.Split(scanner.Text(), ":")
@@ -563,14 +563,13 @@ func ParseAlarmLinks(s string) []*AlarmLink {
 		if err != nil {
 			continue
 		}
-		for len(alarms) < id {
-			alarms = append(alarms, nil)
-		}
-		alarms[id-1] = &AlarmLink{
-			Id:      id,
-			Path:    fields[0],
-			Enabled: fields[2] == "Enabled",
-		}
+		alarms = append(alarms,
+			&AlarmLink{
+				Id:      id,
+				Path:    fields[0],
+				Enabled: fields[2] == "Enabled",
+			},
+		)
 	}
 	return alarms
 }
