@@ -36,6 +36,7 @@ func NewCmdReport() *cobra.Command {
 Available subcommands:
   io                - IO points (InfinityInput and InfinityOutput) with electrical and engineering scale info
   points            - Point summary (String, Numeric, Input, Output, DateTime) with value and setpoint
+  controllers       - Controller summary
   alarms            - Points that have alarm links, expanded one row per alarm
   logs              - Points that have logging configured
   alarm-enrollments - AlarmEnrollment objects with parsed event parameters
@@ -51,6 +52,7 @@ Available subcommands:
 	cc.AddCommand(
 		NewCmdIO(),
 		NewCmdPoints(),
+		NewCmdControllers(),
 		NewCmdAlarms(),
 		NewCmdLogs(),
 		NewCmdAlarmEnrollments(),
@@ -80,6 +82,12 @@ func (cmd *reportCmd) Execute() {
 	table := ioReport(r, nil, nil)
 	if len(table) > 0 {
 		writeXLSXSheet(f, "IO Points", ioHeaders, table)
+	}
+
+	r.Seek(0, 0)
+	table = controllerReport(r, nil, nil, nil)
+	if len(table) > 0 {
+		writeXLSXSheet(f, "Controllers", controllerHeaders, table)
 	}
 
 	r.Seek(0, 0)
